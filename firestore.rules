@@ -1,0 +1,98 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can read and update their own profile
+    match /users/{userId} {
+      // Allow users to create their own profile during signup
+      allow create: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow users to read and update their own profile
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Aadhaar verification requests
+    match /aadhaarVerifications/{docId} {
+      // Users can create and read their own verification requests
+      allow create, read: if request.auth != null && request.auth.uid == resource.data.uid;
+    }
+    
+    // Parcel requests
+    match /parcelRequests/{docId} {
+      // Allow read for all authenticated users
+      allow read: if request.auth != null;
+      
+      // Allow create for verified users
+      allow create: if request.auth != null && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isPhoneVerified == true;
+      
+      // Allow update for sender, assigned carrier, or admin
+      // Allow update for sender, assigned carrier
+      allow update: if request.auth != null && (
+        // Sender can update their own requests
+        request.auth.uid == resource.data.senderUid ||
+        // Carrier accepting parcel must be Aadhaar verified
+        (request.auth.uid != resource.data.carrierUid && 
+         request.data.carrierUid == request.auth.uid &&
+         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isPhoneVerified == true &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAadhaarVerified == true &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'carrier') ||
+        // Already assigned carrier can update
+        request.auth.uid == resource.data.carrierUid
+      );
+    }
+    
+    // Train journeys
+    match /trainJourneys/{docId} {
+      // Allow read for all authenticated users
+      allow read: if request.auth != null;
+      
+      // Allow create/update for verified carriers (no Aadhaar verification required for journeys)
+      allow create, update: if request.auth != null && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isPhoneVerified == true &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'carrier';
+    }
+    
+    // Wallet transactions
+    match /walletTransactions/{docId} {
+      // Users can read their own transactions
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      
+      // System can create transactions
+      allow create: if request.auth != null;
+      
+      // Admins can read all transactions
+      allow read: if request.auth != null && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Chat messages
+    match /chats/{chatId}/messages/{messageId} {
+      // Allow read/write for participants
+      allow read, write: if request.auth != null && 
+        request.auth.uid in resource.data.participants;
+    }
+    
+    // Train data (public reference data)
+    match /train_data/{docId} {
+      // Allow read for all authenticated users (reference data)
+      allow read: if request.auth != null;
+    }
+
+    // Station data (public reference data)
+    match /stations/{docId} {
+      // Allow read for all authenticated users (reference data)
+      allow read: if request.auth != null;
+    }
+
+    // Admin only collections
+    match /adminLogs/{docId} {
+      allow read, write: if request.auth != null && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+  }
+}

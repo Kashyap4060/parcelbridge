@@ -1,0 +1,29 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow users to upload their own Aadhaar documents
+    match /aadhaar/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Profile pictures
+    match /profiles/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Profile pictures (alternative path)
+    match /profile-pictures/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Parcel images
+    match /parcels/{parcelId}/{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Restrict file size to 10MB
+    match /{allPaths=**} {
+      allow write: if request.resource.size < 10 * 1024 * 1024;
+    }
+  }
+}

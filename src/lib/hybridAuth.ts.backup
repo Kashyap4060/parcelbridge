@@ -1,0 +1,601 @@
+/**
+ * Hybrid Authentication Service
+ * Firebase Auth + Supabase Database Sync
+ */
+
+import { auth } from './firebase';
+import { supabase } from './supabase';
+import { sessionManager } from './sessionManager';
+import { 
+  User as FirebaseUser,
+  signInWithPhoneNumber,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+  RecaptchaVerifier,
+  ConfirmationResult,
+  signOut as firebaseSignOut,
+  onAuthStateChanged,
+  sendEmailVerification,
+  updateProfile
+} from 'firebase/auth';
+
+export interface HybridUser {
+  // Firebase Auth data
+  firebaseUid: string;
+  phoneNumber?: string;
+  email?: string;
+  isEmailVerified: boolean;
+  
+  // Supabase profile data
+  supabaseId?: string;
+  role?: 'sender' | 'carrier';
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  isPhoneVerified: boolean;
+  isAadhaarVerified: boolean;
+  profileComplete: boolean;
+  authMethod: 'phone' | 'email' | 'google';
+  createdAt: string;
+  updatedAt: string;
+}
+
+class HybridAuthService {
+  private currentUser: HybridUser | null = null;
+
+  /**
+   * Initialize phone authentication with reCAPTCHA
+   */
+  async initializePhoneAuth(containerId: string = 'recaptcha-container'): Promise<RecaptchaVerifier> {
+    const recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
+      size: 'invisible',
+      callback: () => {
+        console.log('reCAPTCHA solved');
+      },
+      'expired-callback': () => {
+        console.log('reCAPTCHA expired');
+      }
+    });
+
+    return recaptchaVerifier;
+  }
+
+  /**
+   * Send OTP to phone number
+   */
+  async sendOTP(phoneNumber: string, recaptchaVerifier: RecaptchaVerifier): Promise<ConfirmationResult> {
+    try {
+      const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
+      return confirmationResult;
+    } catch (error) {
+      console.error('Error sending OTP:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Verify OTP and sign in, optionally setting role
+   */
+  async verifyOTP(confirmationResult: ConfirmationResult, otp: string, role?: 'sender' | 'carrier' | 'admin'): Promise<HybridUser> {
+    try {
+      const result = await confirmationResult.confirm(otp);
+      const firebaseUser = result.user;
+
+      // Sync user to Supabase
+      const hybridUser = await this.syncFirebaseUserToSupabase(firebaseUser, 'phone');
+      
+      // Update role if provided
+      if (role) {
+        await this.updateUserRole(role);
+        hybridUser.role = role;
+      }
+      
+      this.currentUser = hybridUser;
+
+      // Create session
+      await sessionManager.createSession(hybridUser.firebaseUid);
+      
+      // Save user credentials
+      await sessionManager.saveUserCredentials(hybridUser.firebaseUid, hybridUser.role);
+
+      return hybridUser;
+    } catch (error) {
+      console.error('Error verifying OTP:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Sign up with email and password
+   */
+  async signUpWithEmail(email: string, password: string, firstName: string, lastName: string): Promise<HybridUser> {
+    try {
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+      const firebaseUser = result.user;
+
+      // Update display name
+      await updateProfile(firebaseUser, {
+        displayName: `${firstName} ${lastName}`
+      });
+
+      // Send email verification
+      await sendEmailVerification(firebaseUser);
+
+      // Sync user to Supabase with additional profile info
+      const hybridUser = await this.syncFirebaseUserToSupabase(firebaseUser, 'email', {
+        firstName,
+        lastName,
+        email
+      });
+      this.currentUser = hybridUser;
+
+      return hybridUser;
+    } catch (error) {
+      console.error('Error signing up with email:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Sign in with email and password
+   */
+  async signInWithEmail(email: string, password: string): Promise<HybridUser> {
+    try {
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = result.user;
+
+      // Sync user to Supabase
+      const hybridUser = await this.syncFirebaseUserToSupabase(firebaseUser, 'email');
+      this.currentUser = hybridUser;
+
+      // Create session
+      await sessionManager.createSession(hybridUser.firebaseUid);
+      
+      // Save user credentials
+      await sessionManager.saveUserCredentials(hybridUser.firebaseUid, hybridUser.role);
+
+      return hybridUser;
+    } catch (error) {
+      console.error('Error signing in with email:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Sign in with Google
+   */
+  async signInWithGoogle(): Promise<HybridUser> {
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
+
+      const result = await signInWithPopup(auth, provider);
+      const firebaseUser = result.user;
+
+      // Extract name parts from display name
+      const nameParts = firebaseUser.displayName?.split(' ') || [];
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      // Sync user to Supabase
+      const hybridUser = await this.syncFirebaseUserToSupabase(firebaseUser, 'google', {
+        firstName,
+        lastName,
+        email: firebaseUser.email || undefined
+      });
+      this.currentUser = hybridUser;
+
+      // Create session
+      await sessionManager.createSession(hybridUser.firebaseUid);
+      
+      // Save user credentials
+      await sessionManager.saveUserCredentials(hybridUser.firebaseUid, hybridUser.role);
+
+      return hybridUser;
+    } catch (error) {
+      console.error('Error signing in with Google:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Sync Firebase user to Supabase database
+   */
+  private async syncFirebaseUserToSupabase(
+    firebaseUser: FirebaseUser, 
+    authMethod: 'phone' | 'email' | 'google' = 'phone',
+    additionalData?: {
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+    }
+  ): Promise<HybridUser> {
+    try {
+      // Check if user already exists in Supabase
+      const { data: existingUser, error: fetchError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('firebase_uid', firebaseUser.uid)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        throw fetchError;
+      }
+
+      const now = new Date().toISOString();
+
+      if (existingUser) {
+        // Update existing user
+        const updateData: any = {
+          updated_at: now
+        };
+
+        if (authMethod === 'phone') {
+          updateData.phone_number = firebaseUser.phoneNumber;
+          updateData.is_phone_verified = true;
+        } else if (authMethod === 'email' || authMethod === 'google') {
+          updateData.email = firebaseUser.email;
+          updateData.is_email_verified = firebaseUser.emailVerified;
+        }
+
+        if (additionalData) {
+          if (additionalData.firstName) updateData.first_name = additionalData.firstName;
+          if (additionalData.lastName) updateData.last_name = additionalData.lastName;
+        }
+
+        const { data: updatedUser, error: updateError } = await supabase
+          .from('user_profiles')
+          .update(updateData)
+          .eq('firebase_uid', firebaseUser.uid)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+
+        return this.mapSupabaseToHybridUser(firebaseUser, updatedUser);
+      } else {
+        // Create new user in Supabase
+        const insertData: any = {
+          firebase_uid: firebaseUser.uid,
+          auth_method: authMethod,
+          is_aadhaar_verified: false,
+          profile_complete: false,
+          created_at: now,
+          updated_at: now
+        };
+
+        if (authMethod === 'phone') {
+          insertData.phone_number = firebaseUser.phoneNumber;
+          insertData.is_phone_verified = true;
+          insertData.is_email_verified = false;
+        } else if (authMethod === 'email' || authMethod === 'google') {
+          insertData.email = firebaseUser.email;
+          insertData.is_email_verified = firebaseUser.emailVerified;
+          insertData.is_phone_verified = false;
+        }
+
+        if (additionalData) {
+          if (additionalData.firstName) insertData.first_name = additionalData.firstName;
+          if (additionalData.lastName) insertData.last_name = additionalData.lastName;
+          if (additionalData.firstName && additionalData.lastName) {
+            insertData.full_name = `${additionalData.firstName} ${additionalData.lastName}`;
+          }
+        }
+
+        const { data: newUser, error: insertError } = await supabase
+          .from('user_profiles')
+          .insert(insertData)
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+
+        return this.mapSupabaseToHybridUser(firebaseUser, newUser);
+      }
+    } catch (error) {
+      console.error('Error syncing user to Supabase:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Map Supabase user data to HybridUser interface
+   */
+  private mapSupabaseToHybridUser(firebaseUser: FirebaseUser, supabaseUser: any): HybridUser {
+    return {
+      firebaseUid: firebaseUser.uid,
+      phoneNumber: firebaseUser.phoneNumber || undefined,
+      email: firebaseUser.email || supabaseUser.email,
+      isEmailVerified: firebaseUser.emailVerified,
+      supabaseId: supabaseUser.id,
+      role: supabaseUser.role,
+      firstName: supabaseUser.first_name,
+      lastName: supabaseUser.last_name,
+      fullName: supabaseUser.full_name || `${supabaseUser.first_name || ''} ${supabaseUser.last_name || ''}`.trim(),
+      isPhoneVerified: supabaseUser.is_phone_verified,
+      isAadhaarVerified: supabaseUser.is_aadhaar_verified,
+      profileComplete: supabaseUser.profile_complete || false,
+      authMethod: supabaseUser.auth_method || 'phone',
+      createdAt: supabaseUser.created_at,
+      updatedAt: supabaseUser.updated_at
+    };
+  }
+
+  /**
+   * Update user role in Supabase
+   */
+  async updateUserRole(role: 'sender' | 'carrier' | 'admin'): Promise<void> {
+    if (!this.currentUser?.firebaseUid) {
+      throw new Error('No authenticated user');
+    }
+
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ 
+          role,
+          updated_at: new Date().toISOString()
+        })
+        .eq('firebase_uid', this.currentUser.firebaseUid);
+
+      if (error) throw error;
+
+      // Update current user
+      this.currentUser.role = role;
+    } catch (error) {
+      console.error('Error updating user role:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update user profile in Supabase
+   */
+  async updateUserProfile(updates: Partial<HybridUser>): Promise<void> {
+    if (!this.currentUser?.firebaseUid) {
+      throw new Error('No authenticated user');
+    }
+
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('firebase_uid', this.currentUser.firebaseUid);
+
+      if (error) throw error;
+
+      // Update current user
+      Object.assign(this.currentUser, updates);
+    } catch (error) {
+      console.error('Error updating user profile:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get current user
+   */
+  getCurrentUser(): HybridUser | null {
+    return this.currentUser;
+  }
+
+  /**
+   * Verify phone number for existing user (for email/Google users)
+   */
+  async verifyPhoneForExistingUser(phoneNumber: string, recaptchaVerifier: RecaptchaVerifier): Promise<ConfirmationResult> {
+    try {
+      if (!this.currentUser) {
+        throw new Error('No authenticated user');
+      }
+
+      const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
+      return confirmationResult;
+    } catch (error) {
+      console.error('Error sending phone verification:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Complete phone verification for existing user
+   */
+  async completePhoneVerification(confirmationResult: ConfirmationResult, otp: string): Promise<void> {
+    try {
+      if (!this.currentUser) {
+        throw new Error('No authenticated user');
+      }
+
+      await confirmationResult.confirm(otp);
+
+      // Update phone verification status in Supabase
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ 
+          phone_number: auth.currentUser?.phoneNumber,
+          is_phone_verified: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('firebase_uid', this.currentUser.firebaseUid);
+
+      if (error) throw error;
+
+      // Update current user
+      this.currentUser.phoneNumber = auth.currentUser?.phoneNumber || undefined;
+      this.currentUser.isPhoneVerified = true;
+    } catch (error) {
+      console.error('Error verifying phone:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Listen to auth state changes
+   */
+  onAuthStateChanged(callback: (user: HybridUser | null) => void): () => void {
+    return onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const hybridUser = await this.syncFirebaseUserToSupabase(firebaseUser);
+          this.currentUser = hybridUser;
+          callback(hybridUser);
+        } catch (error) {
+          console.error('Error syncing user:', error);
+          callback(null);
+        }
+      } else {
+        this.currentUser = null;
+        callback(null);
+      }
+    });
+  }
+
+  /**
+   * Sign out
+   */
+  async signOut(): Promise<void> {
+    try {
+      // Destroy session first
+      await sessionManager.destroySession();
+      
+      // Sign out from Firebase
+      await firebaseSignOut(auth);
+      this.currentUser = null;
+      
+      // Redirect to landing page
+      if (typeof window !== 'undefined') {
+        window.location.href = '/';
+      }
+    } catch (error) {
+      console.error('Error signing out:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Switch user role
+   */
+  async switchRole(newRole: 'sender' | 'carrier' | 'admin'): Promise<HybridUser> {
+    try {
+      if (!this.currentUser) {
+        throw new Error('No user authenticated');
+      }
+
+      const previousRole = this.currentUser.role;
+
+      // Update role in Supabase
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .update({ 
+          role: newRole,
+          updated_at: new Date().toISOString()
+        })
+        .eq('firebase_uid', this.currentUser.firebaseUid)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Log role change
+      await sessionManager.logRoleChange(
+        this.currentUser.firebaseUid,
+        previousRole || null,
+        newRole,
+        'User initiated role switch'
+      );
+
+      // Update credentials with new preferred role
+      await sessionManager.saveUserCredentials(this.currentUser.firebaseUid, newRole);
+
+      // Update current user
+      this.currentUser = {
+        ...this.currentUser,
+        role: newRole
+      };
+
+      return this.currentUser;
+    } catch (error) {
+      console.error('Error switching role:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Validate session without automatic redirect
+   */
+  async validateSession(): Promise<boolean> {
+    try {
+      const isValid = await sessionManager.isSessionValid();
+      
+      if (!isValid) {
+        return false;
+      }
+
+      // Session is valid, update activity
+      await sessionManager.updateActivity();
+      return true;
+    } catch (error) {
+      console.error('Error validating session:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get appropriate redirect path for user
+   */
+  async getRedirectPath(user: HybridUser): Promise<string> {
+    // Always redirect to dashboard for authenticated users
+    return '/dashboard';
+  }
+
+  /**
+   * Manual redirect to appropriate page (only call when needed)
+   */
+  async redirectToAppropriate(): Promise<void> {
+    if (typeof window === 'undefined') return;
+    
+    const currentPath = window.location.pathname;
+    
+    if (!this.currentUser) {
+      // No user, redirect to home if on protected page
+      if (currentPath.startsWith('/dashboard')) {
+        window.location.href = '/';
+      }
+      return;
+    }
+
+    // User is authenticated
+    const isSessionValid = await this.validateSession();
+    
+    if (!isSessionValid) {
+      // Session expired, redirect to landing page
+      window.location.href = '/';
+      return;
+    }
+
+    // If user is on landing page, redirect to dashboard
+    if (currentPath === '/' || currentPath === '/auth/login') {
+      const redirectPath = await this.getRedirectPath(this.currentUser);
+      window.location.href = redirectPath;
+    }
+  }
+
+  /**
+   * Legacy method for backward compatibility - now just validates
+   */
+  async validateAndRedirect(): Promise<void> {
+    const isValid = await this.validateSession();
+    if (!isValid) {
+      throw new Error('Session expired');
+    }
+  }
+}
+
+// Export singleton instance
+export const hybridAuth = new HybridAuthService();
+export default hybridAuth;

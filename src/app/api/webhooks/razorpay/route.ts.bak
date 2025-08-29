@@ -1,0 +1,278 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { razorpayService } from '@/lib/razorpay';
+import { supabase } from '@/lib/supabase';
+
+interface RazorpayWebhookEvent {
+  event: string;
+  account_id: string;
+  contains: string[];
+  created_at: number;
+  payload: {
+    payment?: {
+      entity: any;
+    };
+    order?: {
+      entity: any;
+    };
+    refund?: {
+      entity: any;
+    };
+  };
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.text();
+    const signature = request.headers.get('x-razorpay-signature');
+
+    if (!signature) {
+      console.error('Missing Razorpay signature');
+      return NextResponse.json({ error: 'Missing signature' }, { status: 401 });
+    }
+
+    // Verify webhook signature
+    const isValid = razorpayService.verifyWebhookSignature(body, signature);
+    if (!isValid) {
+      console.error('Invalid webhook signature');
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+    }
+
+    const event: RazorpayWebhookEvent = JSON.parse(body);
+    console.log('Razorpay webhook received:', event.event);
+
+    // Handle different webhook events
+    switch (event.event) {
+      case 'payment.captured':
+        await handlePaymentCaptured(event);
+        break;
+        
+      case 'payment.authorized':
+        await handlePaymentAuthorized(event);
+        break;
+        
+      case 'payment.failed':
+        await handlePaymentFailed(event);
+        break;
+        
+      case 'refund.processed':
+        await handleRefundProcessed(event);
+        break;
+        
+      case 'order.paid':
+        await handleOrderPaid(event);
+        break;
+        
+      default:
+        console.log('Unhandled webhook event:', event.event);
+    }
+
+    return NextResponse.json({ status: 'success' });
+  } catch (error: any) {
+    console.error('Webhook processing error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+/**
+ * Handle payment captured (successful payment)
+ */
+async function handlePaymentCaptured(event: RazorpayWebhookEvent) {
+  try {
+    const payment = event.payload.payment?.entity;
+    if (!payment) return;
+
+    const { id: paymentId, order_id: orderId, amount, notes } = payment;
+    const amountInRupees = amount / 100;
+
+    // Get order details to understand the purpose
+    const orderDetails = await razorpayService.getOrderDetails(orderId);
+    const purpose = orderDetails.notes?.purpose;
+
+    if (purpose === 'wallet_topup') {
+      await handleWalletTopUpSuccess(payment, orderDetails);
+    } else if (purpose === 'escrow_payment') {
+      await handleEscrowPaymentSuccess(payment, orderDetails);
+    }
+
+    // Log transaction
+    await logTransaction({
+      paymentId,
+      orderId,
+      type: 'CREDIT',
+      amount: amountInRupees,
+      status: 'SUCCESS',
+      purpose,
+      notes: orderDetails.notes
+    });
+
+    console.log('Payment captured successfully:', paymentId);
+  } catch (error) {
+    console.error('Error handling payment captured:', error);
+  }
+}
+
+/**
+ * Handle wallet top-up success
+ */
+async function handleWalletTopUpSuccess(payment: any, order: any) {
+  try {
+    const userId = order.notes?.userId;
+    const amount = payment.amount / 100;
+
+    if (!userId) {
+      console.error('Missing userId in order notes');
+      return;
+    }
+
+    // Get current user data
+    const userRef = doc(db, 'users', userId);
+    const userDoc = await getDoc(userRef);
+    
+    if (!userDoc.exists()) {
+      console.error('User not found:', userId);
+      return;
+    }
+
+    const userData = userDoc.data();
+    const currentBalance = userData.walletBalance || 0;
+    const newBalance = currentBalance + amount;
+
+    // Update user's wallet balance
+    await updateDoc(userRef, {
+      walletBalance: newBalance,
+      updatedAt: new Date()
+    });
+
+    console.log(`Wallet updated for user ${userId}: ₹${amount} added, new balance: ₹${newBalance}`);
+  } catch (error) {
+    console.error('Error updating wallet balance:', error);
+  }
+}
+
+/**
+ * Handle escrow payment success
+ */
+async function handleEscrowPaymentSuccess(payment: any, order: any) {
+  try {
+    const { parcelId, senderId, carrierId } = order.notes || {};
+    const amount = payment.amount / 100;
+
+    if (!parcelId || !senderId) {
+      console.error('Missing parcel/sender info in order notes');
+      return;
+    }
+
+    // Update parcel request with payment info
+    const parcelRef = doc(db, 'parcelRequests', parcelId);
+    await updateDoc(parcelRef, {
+      paymentStatus: 'PAID',
+      paymentId: payment.id,
+      paymentAmount: amount,
+      paidAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    console.log(`Escrow payment created for parcel ${parcelId}: ₹${amount}`);
+  } catch (error) {
+    console.error('Error handling escrow payment:', error);
+  }
+}
+
+/**
+ * Handle payment authorization (for escrow)
+ */
+async function handlePaymentAuthorized(event: RazorpayWebhookEvent) {
+  try {
+    const payment = event.payload.payment?.entity;
+    if (!payment) return;
+
+    // Similar to captured but for authorized payments
+    console.log('Payment authorized:', payment.id);
+  } catch (error) {
+    console.error('Error handling payment authorized:', error);
+  }
+}
+
+/**
+ * Handle payment failure
+ */
+async function handlePaymentFailed(event: RazorpayWebhookEvent) {
+  try {
+    const payment = event.payload.payment?.entity;
+    if (!payment) return;
+
+    const { id: paymentId, order_id: orderId, error_code, error_description } = payment;
+
+    // Log failed transaction
+    await logTransaction({
+      paymentId,
+      orderId,
+      type: 'DEBIT',
+      amount: payment.amount / 100,
+      status: 'FAILED',
+      error: {
+        code: error_code,
+        description: error_description
+      }
+    });
+
+    console.log('Payment failed:', paymentId, error_description);
+  } catch (error) {
+    console.error('Error handling payment failure:', error);
+  }
+}
+
+/**
+ * Handle refund processing
+ */
+async function handleRefundProcessed(event: RazorpayWebhookEvent) {
+  try {
+    const refund = event.payload.refund?.entity;
+    if (!refund) return;
+
+    const { id: refundId, payment_id: paymentId, amount } = refund;
+    const amountInRupees = amount / 100;
+
+    // Log refund transaction
+    await logTransaction({
+      paymentId,
+      refundId,
+      type: 'REFUND',
+      amount: amountInRupees,
+      status: 'SUCCESS'
+    });
+
+    console.log('Refund processed:', refundId, '₹' + amountInRupees);
+  } catch (error) {
+    console.error('Error handling refund:', error);
+  }
+}
+
+/**
+ * Handle order paid event
+ */
+async function handleOrderPaid(event: RazorpayWebhookEvent) {
+  try {
+    const order = event.payload.order?.entity;
+    if (!order) return;
+
+    console.log('Order paid:', order.id);
+  } catch (error) {
+    console.error('Error handling order paid:', error);
+  }
+}
+
+/**
+ * Log transaction to Firestore
+ */
+async function logTransaction(transactionData: any) {
+  try {
+    await addDoc(collection(db, 'transactions'), {
+      ...transactionData,
+      createdAt: new Date(),
+      source: 'razorpay_webhook'
+    });
+  } catch (error) {
+    console.error('Error logging transaction:', error);
+  }
+}
