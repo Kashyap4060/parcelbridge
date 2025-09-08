@@ -7,13 +7,14 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+  apiKey: "AIzaSyDs2IZQTkdLgixue39Z2GpC3hB0gzj3lz4",
+  authDomain: "parcel-bridge-4088.firebaseapp.com",
+  databaseURL: "https://parcel-bridge-4088-default-rtdb.firebaseio.com",
+  projectId: "parcel-bridge-4088",
+  storageBucket: "parcel-bridge-4088.firebasestorage.app",
+  messagingSenderId: "411262188769",
+  appId: "1:411262188769:web:854dc9678e1d9f8d26cba0",
+  measurementId: "G-BLDMZLV7PF"
 };
 
 // Initialize Firebase
