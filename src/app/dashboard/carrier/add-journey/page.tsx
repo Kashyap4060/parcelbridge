@@ -4,9 +4,14 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSimpleAuth } from '@/hooks/useSimpleAuth';
 import { Button } from '@/components/ui/Button';
-import { ArrowLeftIcon, TruckIcon } from '@heroicons/react/24/outline';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ArrowLeftIcon, TruckIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { getPNRData, validatePNRFormat, extractTimeInfo } from '@/lib/pnrService';
 import { createJourney, checkPNRExists } from '@/lib/journeyService';
+import { cn } from '@/lib/utils';
 
 export default function AddJourney() {
   const { user, isAuthenticated } = useSimpleAuth();
@@ -238,9 +243,10 @@ export default function AddJourney() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-3xl mx-auto px-4">
-        <div className="flex items-center gap-4 mb-8">
+    <div className="container mx-auto py-8 px-4">
+      <div className="max-w-3xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center gap-4">
           <Button
             variant="outline"
             onClick={() => router.back()}
@@ -249,38 +255,46 @@ export default function AddJourney() {
             <ArrowLeftIcon className="h-4 w-4" />
             Back
           </Button>
-          <h1 className="text-3xl font-bold text-gray-900">Add New Journey</h1>
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Add New Journey</h1>
+            <p className="text-muted-foreground">Register your train journey to start accepting parcels</p>
+          </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* PNR Information */}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Train Booking Information</h2>
-              <div className="flex gap-4 mb-4">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    PNR Number
-                  </label>
-                  <input
-                    type="text"
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* PNR Information Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TruckIcon className="h-5 w-5" />
+                Train Booking Information
+              </CardTitle>
+              <CardDescription>
+                Enter your IRCTC PNR number to automatically fetch train details
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-4">
+                <div className="flex-1 space-y-2">
+                  <Label htmlFor="pnr">PNR Number</Label>
+                  <Input
+                    id="pnr"
                     name="pnr"
+                    type="text"
                     required
                     value={formData.pnr}
                     onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-                      pnrError 
-                        ? 'border-red-300 focus:ring-red-500' 
-                        : 'border-gray-300 focus:ring-blue-500'
-                    }`}
+                    className={cn(
+                      pnrError && "border-destructive focus-visible:ring-destructive"
+                    )}
                     placeholder="10-digit PNR number"
                     maxLength={10}
                   />
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="text-xs text-muted-foreground">
                     Enter your IRCTC PNR number to automatically fetch train details
                   </p>
                   {pnrError && (
-                    <p className="mt-1 text-sm text-red-600">{pnrError}</p>
+                    <p className="text-sm text-destructive">{pnrError}</p>
                   )}
                 </div>
                 <div className="flex items-end">
@@ -294,283 +308,299 @@ export default function AddJourney() {
                   </Button>
                 </div>
               </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* Train Information */}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          {/* Train Information Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
                 Train Details
                 {isPnrFetched && (
-                  <span className="ml-2 text-sm text-green-600 font-normal">
-                    ✓ Fetched from PNR
+                  <span className="flex items-center gap-1 text-sm text-green-600 font-normal">
+                    <CheckCircleIcon className="h-4 w-4" />
+                    Fetched from PNR
                   </span>
                 )}
-              </h2>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
               <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Train Number
-                  </label>
-                  <input
-                    type="text"
+                <div className="space-y-2">
+                  <Label htmlFor="trainNumber">Train Number</Label>
+                  <Input
+                    id="trainNumber"
                     name="trainNumber"
+                    type="text"
                     required
                     value={formData.trainNumber}
                     onChange={handleInputChange}
                     disabled={isPnrFetched}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      isPnrFetched ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
+                    className={cn(
+                      isPnrFetched && "bg-muted cursor-not-allowed"
+                    )}
                     placeholder="e.g., 12345"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Train Name
-                  </label>
-                  <input
-                    type="text"
+                <div className="space-y-2">
+                  <Label htmlFor="trainName">Train Name</Label>
+                  <Input
+                    id="trainName"
                     name="trainName"
+                    type="text"
                     required
                     value={formData.trainName}
                     onChange={handleInputChange}
                     disabled={isPnrFetched}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      isPnrFetched ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
+                    className={cn(
+                      isPnrFetched && "bg-muted cursor-not-allowed"
+                    )}
                     placeholder="e.g., Rajdhani Express"
                   />
                 </div>
               </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* Route Information */}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          {/* Route Information Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
                 Route Information
                 {isPnrFetched && (
-                  <span className="ml-2 text-sm text-green-600 font-normal">
-                    ✓ Fetched from PNR
+                  <span className="flex items-center gap-1 text-sm text-green-600 font-normal">
+                    <CheckCircleIcon className="h-4 w-4" />
+                    Fetched from PNR
                   </span>
                 )}
-              </h2>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
               <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    From Station
-                  </label>
-                  <input
-                    type="text"
+                <div className="space-y-2">
+                  <Label htmlFor="fromStation">From Station</Label>
+                  <Input
+                    id="fromStation"
                     name="fromStation"
+                    type="text"
                     required
                     value={formData.fromStation}
                     onChange={handleInputChange}
                     disabled={isPnrFetched}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      isPnrFetched ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
+                    className={cn(
+                      isPnrFetched && "bg-muted cursor-not-allowed"
+                    )}
                     placeholder="e.g., New Delhi"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    To Station
-                  </label>
-                  <input
-                    type="text"
+                <div className="space-y-2">
+                  <Label htmlFor="toStation">To Station</Label>
+                  <Input
+                    id="toStation"
                     name="toStation"
+                    type="text"
                     required
                     value={formData.toStation}
                     onChange={handleInputChange}
                     disabled={isPnrFetched}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      isPnrFetched ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
+                    className={cn(
+                      isPnrFetched && "bg-muted cursor-not-allowed"
+                    )}
                     placeholder="e.g., Mumbai Central"
                   />
                 </div>
               </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* Schedule Information */}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          {/* Schedule Information Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
                 Schedule
                 {isPnrFetched && (
-                  <span className="ml-2 text-sm text-green-600 font-normal">
-                    ✓ Fetched from PNR
+                  <span className="flex items-center gap-1 text-sm text-green-600 font-normal">
+                    <CheckCircleIcon className="h-4 w-4" />
+                    Fetched from PNR
                   </span>
                 )}
-              </h2>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
               <div className="grid md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Departure Date
-                  </label>
-                  <input
-                    type="date"
+                <div className="space-y-2">
+                  <Label htmlFor="departureDate">Departure Date</Label>
+                  <Input
+                    id="departureDate"
                     name="departureDate"
+                    type="date"
                     required
                     value={formData.departureDate}
                     onChange={handleInputChange}
                     disabled={isPnrFetched}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      isPnrFetched ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
+                    className={cn(
+                      isPnrFetched && "bg-muted cursor-not-allowed"
+                    )}
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Departure Time
-                  </label>
-                  <input
-                    type="time"
+                <div className="space-y-2">
+                  <Label htmlFor="departureTime">Departure Time</Label>
+                  <Input
+                    id="departureTime"
                     name="departureTime"
+                    type="time"
                     required
                     value={formData.departureTime}
                     onChange={handleInputChange}
                     disabled={isPnrFetched}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      isPnrFetched ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
+                    className={cn(
+                      isPnrFetched && "bg-muted cursor-not-allowed"
+                    )}
                   />
                   {isPnrFetched && formData.departureTime12 && (
-                    <p className="mt-1 text-xs text-gray-500">{formData.departureTime12} (12-hour)</p>
+                    <p className="text-xs text-muted-foreground">{formData.departureTime12} (12-hour)</p>
                   )}
                 </div>
               </div>
               <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Arrival Date
-                  </label>
-                  <input
-                    type="date"
+                <div className="space-y-2">
+                  <Label htmlFor="arrivalDate">Arrival Date</Label>
+                  <Input
+                    id="arrivalDate"
                     name="arrivalDate"
+                    type="date"
                     required
                     value={formData.arrivalDate}
                     onChange={handleInputChange}
                     disabled={isPnrFetched}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      isPnrFetched ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
+                    className={cn(
+                      isPnrFetched && "bg-muted cursor-not-allowed"
+                    )}
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Arrival Time
-                  </label>
-                  <input
-                    type="time"
+                <div className="space-y-2">
+                  <Label htmlFor="arrivalTime">Arrival Time</Label>
+                  <Input
+                    id="arrivalTime"
                     name="arrivalTime"
+                    type="time"
                     required
                     value={formData.arrivalTime}
                     onChange={handleInputChange}
                     disabled={isPnrFetched}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      isPnrFetched ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
+                    className={cn(
+                      isPnrFetched && "bg-muted cursor-not-allowed"
+                    )}
                   />
                   {isPnrFetched && formData.arrivalTime12 && (
-                    <p className="mt-1 text-xs text-gray-500">{formData.arrivalTime12} (12-hour)</p>
+                    <p className="text-xs text-muted-foreground">{formData.arrivalTime12} (12-hour)</p>
                   )}
                 </div>
               </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* Seat Information */}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          {/* Seat Information Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
                 Seat Information
                 {isPnrFetched && (
-                  <span className="ml-2 text-sm text-green-600 font-normal">
-                    ✓ Fetched from PNR
+                  <span className="flex items-center gap-1 text-sm text-green-600 font-normal">
+                    <CheckCircleIcon className="h-4 w-4" />
+                    Fetched from PNR
                   </span>
                 )}
-              </h2>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
               <div className="grid md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Coach Type
-                  </label>
-                  <select
-                    name="coachType"
-                    value={formData.coachType}
-                    onChange={handleInputChange}
+                <div className="space-y-2">
+                  <Label htmlFor="coachType">Coach Type</Label>
+                  <Select 
+                    name="coachType" 
+                    value={formData.coachType} 
+                    onValueChange={(value) => setFormData(prev => ({...prev, coachType: value}))}
                     disabled={isPnrFetched}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      isPnrFetched ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
                   >
-                    <option value="sleeper">Sleeper (SL)</option>
-                    <option value="ac3">AC 3 Tier (3A)</option>
-                    <option value="ac2">AC 2 Tier (2A)</option>
-                    <option value="ac1">AC 1 Tier (1A)</option>
-                    <option value="cc">Chair Car (CC)</option>
-                    <option value="2s">Second Sitting (2S)</option>
-                  </select>
+                    <SelectTrigger className={cn(
+                      isPnrFetched && "bg-muted cursor-not-allowed"
+                    )}>
+                      <SelectValue placeholder="Select coach type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="sleeper">Sleeper (SL)</SelectItem>
+                      <SelectItem value="ac3">AC 3 Tier (3A)</SelectItem>
+                      <SelectItem value="ac2">AC 2 Tier (2A)</SelectItem>
+                      <SelectItem value="ac1">AC 1 Tier (1A)</SelectItem>
+                      <SelectItem value="cc">Chair Car (CC)</SelectItem>
+                      <SelectItem value="2s">Second Sitting (2S)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Coach Number
-                  </label>
-                  <input
-                    type="text"
+                <div className="space-y-2">
+                  <Label htmlFor="coachNumber">Coach Number</Label>
+                  <Input
+                    id="coachNumber"
                     name="coachNumber"
+                    type="text"
                     value={formData.coachNumber}
                     onChange={handleInputChange}
                     disabled={isPnrFetched}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      isPnrFetched ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
+                    className={cn(
+                      isPnrFetched && "bg-muted cursor-not-allowed"
+                    )}
                     placeholder="e.g., S4, B1"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Seat Number
-                  </label>
-                  <input
-                    type="text"
+                <div className="space-y-2">
+                  <Label htmlFor="seatNumber">Seat Number</Label>
+                  <Input
+                    id="seatNumber"
                     name="seatNumber"
+                    type="text"
                     required
                     value={formData.seatNumber}
                     onChange={handleInputChange}
                     disabled={isPnrFetched}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      isPnrFetched ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
+                    className={cn(
+                      isPnrFetched && "bg-muted cursor-not-allowed"
+                    )}
                     placeholder="e.g., 35, 25"
                   />
                 </div>
               </div>
               {isPnrFetched && (
-                <p className="mt-2 text-sm text-blue-600">
+                <p className="mt-4 text-sm text-blue-600">
                   Seat information has been automatically filled from your PNR details.
                 </p>
               )}
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* Submit Button */}
-            <div className="flex gap-4 pt-6">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => router.back()}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={loading}
-                className="flex-1"
-              >
-                {loading ? 'Creating Journey...' : 'Create Journey'}
-              </Button>
-            </div>
-          </form>
-        </div>
+          {/* Submit Button */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex gap-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => router.back()}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1"
+                >
+                  {loading ? 'Creating Journey...' : 'Create Journey'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </form>
       </div>
     </div>
   );

@@ -4,10 +4,16 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSimpleAuth } from '@/hooks/useSimpleAuth';
 import { Button } from '@/components/ui/Button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StationSelector } from '@/components/ui/StationSelector';
 import { Station } from '@/lib/stationService';
 import { createParcelRequest } from '@/lib/parcelRequests';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
+import { cn } from '@/lib/utils';
 
 export default function CreateRequest() {
   const { user, isAuthenticated } = useSimpleAuth();
@@ -51,60 +57,84 @@ export default function CreateRequest() {
     try {
       // Validate that both stations are selected
       if (!formData.fromStation || !formData.toStation) {
-        console.log('Validation failed: Missing stations');
-        alert('Please select both from and to stations');
+        toast({
+          title: "Validation Error",
+          description: "Please select both from and to stations",
+          variant: "destructive",
+        });
         setLoading(false);
         return;
       }
 
       // Validate that from and to stations are different
       if (formData.fromStation.code === formData.toStation.code) {
-        console.log('Validation failed: Same stations');
-        alert('From and To stations must be different');
+        toast({
+          title: "Validation Error", 
+          description: "From and To stations must be different",
+          variant: "destructive",
+        });
         setLoading(false);
         return;
       }
 
       // Validate required fields
       if (!formData.receiverName.trim()) {
-        console.log('Validation failed: Missing receiver name');
-        alert('Please enter receiver name');
+        toast({
+          title: "Validation Error",
+          description: "Please enter receiver name", 
+          variant: "destructive",
+        });
         setLoading(false);
         return;
       }
 
       if (!formData.receiverPhone.trim()) {
-        console.log('Validation failed: Missing receiver phone');
-        alert('Please enter receiver phone number');
+        toast({
+          title: "Validation Error",
+          description: "Please enter receiver phone number",
+          variant: "destructive", 
+        });
         setLoading(false);
         return;
       }
 
       if (!formData.weight.trim()) {
-        console.log('Validation failed: Missing weight');
-        alert('Please enter parcel weight');
+        toast({
+          title: "Validation Error",
+          description: "Please enter parcel weight",
+          variant: "destructive",
+        });
         setLoading(false);
         return;
       }
 
       if (!formData.length.trim() || !formData.breadth.trim() || !formData.height.trim()) {
-        console.log('Validation failed: Missing dimensions');
-        alert('Please enter all parcel dimensions (length, breadth, height)');
+        toast({
+          title: "Validation Error",
+          description: "Please enter all parcel dimensions (length, breadth, height)",
+          variant: "destructive",
+        });
         setLoading(false);
         return;
       }
 
       if (!formData.parcelType) {
-        console.log('Validation failed: Missing parcel type');
-        alert('Please select parcel type');
+        toast({
+          title: "Validation Error", 
+          description: "Please select parcel type",
+          variant: "destructive",
+        });
         setLoading(false);
         return;
       }
 
       // Validate parcel type
       if (formData.parcelType === 'other' && !formData.customParcelType.trim()) {
-        console.log('Validation failed: Missing custom parcel type');
-        alert('Please describe what you are sending');
+        toast({
+          title: "Validation Error",
+          description: "Please describe what you are sending",
+          variant: "destructive",
+        });
         setLoading(false);
         return;
       }
@@ -135,7 +165,10 @@ export default function CreateRequest() {
       const createdRequest = await createParcelRequest(requestData);
       
       console.log('Request created successfully:', createdRequest);
-      alert('Parcel request created successfully!');
+      toast({
+        title: "Success!",
+        description: "Parcel request created successfully!",
+      });
       
       // Redirect to requests page
       router.push('/dashboard/sender/requests');
@@ -147,7 +180,11 @@ export default function CreateRequest() {
         errorMessage = error.message;
       }
       
-      alert(errorMessage);
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -158,9 +195,10 @@ export default function CreateRequest() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-3xl mx-auto px-4">
-        <div className="flex items-center gap-4 mb-8">
+    <div className="container mx-auto py-8 px-4">
+      <div className="max-w-3xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center gap-4">
           <Button
             variant="outline"
             onClick={() => router.back()}
@@ -169,26 +207,30 @@ export default function CreateRequest() {
             <ArrowLeftIcon className="h-4 w-4" />
             Back
           </Button>
-          <h1 className="text-3xl font-bold text-gray-900">Create Parcel Request</h1>
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Create Parcel Request</h1>
+            <p className="text-muted-foreground">Post a new parcel for delivery</p>
+          </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Route Information */}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Route Information</h2>
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-4">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm text-blue-700">
-                      Please select valid railway stations from the dropdown. Only registered Indian Railway stations can be used for parcel delivery matching with carrier journeys.
-                    </p>
-                  </div>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Route Information Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                Route Information
+              </CardTitle>
+              <CardDescription>
+                Select your departure and destination stations
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <InformationCircleIcon className="h-5 w-5 text-blue-600 mt-0.5" />
+                  <p className="text-sm text-blue-700">
+                    Please select valid railway stations from the dropdown. Only registered Indian Railway stations can be used for parcel delivery matching with carrier journeys.
+                  </p>
                 </div>
               </div>
               <div className="grid md:grid-cols-2 gap-4">
@@ -207,160 +249,158 @@ export default function CreateRequest() {
                   required
                 />
               </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* Receiver Information */}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Receiver Information</h2>
+          {/* Receiver Information Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Receiver Information</CardTitle>
+              <CardDescription>
+                Details of the person who will receive the parcel
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
               <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Receiver Name
-                  </label>
-                  <input
-                    type="text"
+                <div className="space-y-2">
+                  <Label htmlFor="receiverName">Receiver Name</Label>
+                  <Input
+                    id="receiverName"
                     name="receiverName"
+                    type="text"
                     required
                     value={formData.receiverName}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Full name"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Receiver Phone
-                  </label>
-                  <input
-                    type="tel"
+                <div className="space-y-2">
+                  <Label htmlFor="receiverPhone">Receiver Phone</Label>
+                  <Input
+                    id="receiverPhone"
                     name="receiverPhone"
+                    type="tel"
                     required
                     value={formData.receiverPhone}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="10-digit mobile number"
                   />
                 </div>
               </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* Parcel Information */}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Parcel Information</h2>
-              
+          {/* Parcel Information Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Parcel Information</CardTitle>
+              <CardDescription>
+                Weight, dimensions, and type of your parcel
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
               {/* Weight and Parcel Type */}
-              <div className="grid md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Weight (kg)
-                  </label>
-                  <input
-                    type="number"
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="weight">Weight (kg)</Label>
+                  <Input
+                    id="weight"
                     name="weight"
+                    type="number"
                     required
                     step="0.1"
                     min="0.1"
                     max="20"
                     value={formData.weight}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="e.g., 2.5"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Parcel Type
-                  </label>
-                  <select
-                    name="parcelType"
+                <div className="space-y-2">
+                  <Label htmlFor="parcelType">Parcel Type</Label>
+                  <Select 
+                    name="parcelType" 
+                    value={formData.parcelType} 
+                    onValueChange={(value) => setFormData(prev => ({...prev, parcelType: value}))}
                     required
-                    value={formData.parcelType}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">Select parcel type</option>
-                    <option value="documents">Documents</option>
-                    <option value="clothes">Clothes</option>
-                    <option value="grocery">Grocery</option>
-                    <option value="electronics">Electronics</option>
-                    <option value="books">Books</option>
-                    <option value="medicines">Medicines</option>
-                    <option value="gifts">Gifts</option>
-                    <option value="food-items">Food Items</option>
-                    <option value="other">Other</option>
-                  </select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select parcel type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="documents">Documents</SelectItem>
+                      <SelectItem value="clothes">Clothes</SelectItem>
+                      <SelectItem value="grocery">Grocery</SelectItem>
+                      <SelectItem value="electronics">Electronics</SelectItem>
+                      <SelectItem value="books">Books</SelectItem>
+                      <SelectItem value="medicines">Medicines</SelectItem>
+                      <SelectItem value="gifts">Gifts</SelectItem>
+                      <SelectItem value="food-items">Food Items</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
-              {/* Custom Parcel Type (only show if "Other" is selected) */}
+              {/* Custom Parcel Type */}
               {formData.parcelType === 'other' && (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Describe what you're sending
-                  </label>
-                  <input
-                    type="text"
+                <div className="space-y-2">
+                  <Label htmlFor="customParcelType">Describe what you're sending</Label>
+                  <Input
+                    id="customParcelType"
                     name="customParcelType"
+                    type="text"
                     required
                     value={formData.customParcelType}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Please describe the items you're sending"
                   />
                 </div>
               )}
 
               {/* Dimensions */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Dimensions (in centimeters)
-                </label>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Length
-                    </label>
-                    <input
-                      type="number"
+              <div>
+                <Label className="text-base">Dimensions (in centimeters)</Label>
+                <div className="grid grid-cols-3 gap-4 mt-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="length">Length</Label>
+                    <Input
+                      id="length"
                       name="length"
+                      type="number"
                       required
                       min="1"
                       max="100"
                       value={formData.length}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="cm"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Breadth
-                    </label>
-                    <input
-                      type="number"
+                  <div className="space-y-2">
+                    <Label htmlFor="breadth">Breadth</Label>
+                    <Input
+                      id="breadth"
                       name="breadth"
+                      type="number"
                       required
                       min="1"
                       max="100"
                       value={formData.breadth}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="cm"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Height
-                    </label>
-                    <input
-                      type="number"
+                  <div className="space-y-2">
+                    <Label htmlFor="height">Height</Label>
+                    <Input
+                      id="height"
                       name="height"
+                      type="number"
                       required
                       min="1"
                       max="100"
                       value={formData.height}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="cm"
                     />
                   </div>
@@ -368,41 +408,43 @@ export default function CreateRequest() {
               </div>
 
               {/* Description */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Additional Description (Optional)
-                </label>
-                <textarea
+              <div className="space-y-2">
+                <Label htmlFor="description">Additional Description (Optional)</Label>
+                <Textarea
+                  id="description"
                   name="description"
                   value={formData.description}
                   onChange={handleInputChange}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Any additional details about the parcel"
                 />
               </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* Submit Button */}
-            <div className="flex gap-4 pt-6">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => router.back()}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={loading}
-                className="flex-1"
-              >
-                {loading ? 'Creating Request...' : 'Create Request'}
-              </Button>
-            </div>
-          </form>
-        </div>
+          {/* Submit Button */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex gap-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => router.back()}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1"
+                >
+                  {loading ? 'Creating Request...' : 'Create Request'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </form>
       </div>
     </div>
   );

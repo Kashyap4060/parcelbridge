@@ -3,6 +3,8 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import Script from 'next/script';
 import { ClientProviders } from '@/components/providers/ClientProviders';
+import { ThemeProvider } from '@/components/theme-provider';
+import { ToastProvider } from '@/components/toast-provider';
 
 const inter = Inter({
   subsets: ["latin"],
@@ -74,20 +76,28 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head></head>
-      <body className={`${inter.variable} font-sans antialiased bg-gray-50`}>
+      <body className={`${inter.variable} font-sans antialiased`}>
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:bg-white focus:text-blue-700 focus:px-4 focus:py-2 focus:rounded"
         >
           Skip to content
         </a>
-        <ClientProviders>
-          <main id="main-content" role="main" className="min-h-screen">
-            {children}
-          </main>
-        </ClientProviders>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <ClientProviders>
+            <main id="main-content" role="main" className="min-h-screen">
+              {children}
+            </main>
+          </ClientProviders>
+          {/* <ToastProvider /> */}
+        </ThemeProvider>
         <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
       </body>
     </html>
