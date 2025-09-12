@@ -1,19 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { useHybridAuth } from '@/hooks/useHybridAuth';
+import { useSimpleAuth } from '@/hooks/useSimpleAuth';
 import { Button } from '@/components/ui/Button';
 import { UserIcon, EnvelopeIcon, PhoneIcon, CakeIcon } from '@heroicons/react/24/outline';
 
 export default function Profile() {
-  const { user, isAuthenticated, signOut } = useHybridAuth();
+  const { user, isAuthenticated, signOut } = useSimpleAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
     email: user?.email || '',
-    phone: user?.phoneNumber || '',
+    phone: user?.phone || '',
     dateOfBirth: '',
     address: ''
   });
@@ -148,7 +148,7 @@ export default function Profile() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               ) : (
-                <p className="text-gray-900">{user?.phoneNumber || 'Not set'}</p>
+                <p className="text-gray-900">{user?.phone || 'Not set'}</p>
               )}
             </div>
 
@@ -199,12 +199,12 @@ export default function Profile() {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Authentication Method</span>
-              <span className="text-gray-900">{user?.authMethod}</span>
+              <span className="text-gray-900">{user?.email}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Profile Complete</span>
-              <span className={`${user?.profileComplete ? 'text-green-600' : 'text-orange-600'}`}>
-                {user?.profileComplete ? 'Yes' : 'No'}
+              <span className={`${true ? 'text-green-600' : 'text-orange-600'}`}>
+                {true ? 'Yes' : 'No'}
               </span>
             </div>
             <div className="flex justify-between">
@@ -215,8 +215,8 @@ export default function Profile() {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Phone Verified</span>
-              <span className={`${user?.isPhoneVerified ? 'text-green-600' : 'text-orange-600'}`}>
-                {user?.isPhoneVerified ? 'Yes' : 'No'}
+              <span className={`${!!user?.phone ? 'text-green-600' : 'text-orange-600'}`}>
+                {!!user?.phone ? 'Yes' : 'No'}
               </span>
             </div>
           </div>
@@ -237,3 +237,6 @@ export default function Profile() {
     </div>
   );
 }
+
+
+

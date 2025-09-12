@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useHybridAuth } from './useHybridAuth';
+import { useSimpleAuth } from './useSimpleAuth';
 
 /**
  * useRequireRole
@@ -10,12 +10,12 @@ import { useHybridAuth } from './useHybridAuth';
  * Redirects to login if unauthenticated, or dashboard if role mismatch.
  * Returns loading flag to help caller avoid flicker.
  */
-export function useRequireRole(requiredRole: 'sender' | 'carrier') {
+export function useRequireRole(requiredRole: 'sender' | 'carrier' | 'admin') {
   const router = useRouter();
-  const { user, isLoading } = useHybridAuth();
+  const { user, loading } = useSimpleAuth();
 
   useEffect(() => {
-    if (isLoading) return;
+    if (loading) return;
     if (!user) {
       router.push('/auth/login');
       return;
@@ -23,10 +23,13 @@ export function useRequireRole(requiredRole: 'sender' | 'carrier') {
     if (user.role !== requiredRole) {
       router.push('/dashboard');
     }
-  }, [isLoading, user, requiredRole, router]);
+  }, [loading, user, requiredRole, router]);
 
   const isAuthorized = !!user && user.role === requiredRole;
-  return { isLoading, isAuthorized, user } as const;
+  return { isLoading: loading, isAuthorized, user } as const;
 }
+
+
+
 
 

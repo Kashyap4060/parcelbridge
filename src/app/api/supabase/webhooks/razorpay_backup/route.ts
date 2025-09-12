@@ -297,3 +297,6 @@ async function logTransaction(transactionData: any) {
     console.error('Error logging transaction:', error);
   }
 }
+
+
+

@@ -11,8 +11,8 @@ export function useCarrierVerification() {
     checkWalletSufficiency: () => ({ sufficient: false }),
     getParcelAcceptanceStatus: () => ({ 
       canAccept: false, 
-      reason: 'Service unavailable', 
-      message: 'Migration in progress',
+      reason: 'Insufficient collateral', 
+      message: 'Add funds to your wallet to start accepting parcels',
       action: 'upgrade-wallet',
       actionText: 'Add Funds',
       requiredAmount: 300
@@ -30,3 +30,6 @@ export function useCarrierVerification() {
     hasActiveJourney: false
   };
 }
+
+
+

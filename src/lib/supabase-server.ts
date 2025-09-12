@@ -24,3 +24,6 @@ export function createClient() {
 }
 
 export { createClient as createSupabaseServer }
+
+
+

@@ -2,16 +2,18 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useHybridAuth } from '@/hooks/useHybridAuth';
+import { useSimpleAuth } from '@/hooks/useSimpleAuth';
 import { Button } from '@/components/ui/Button';
 import { ArrowLeftIcon, TruckIcon } from '@heroicons/react/24/outline';
-import { getPNRData, validatePNRFormat } from '@/lib/pnrService';
+import { getPNRData, validatePNRFormat, extractTimeInfo } from '@/lib/pnrService';
+import { createJourney, checkPNRExists } from '@/lib/journeyService';
 
 export default function AddJourney() {
-  const { user, isAuthenticated } = useHybridAuth();
+  const { user, isAuthenticated } = useSimpleAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [pnrError, setPnrError] = useState('');
+  const [isPnrFetched, setIsPnrFetched] = useState(false);
   const [formData, setFormData] = useState({
     pnr: '',
     trainNumber: '',
@@ -20,13 +22,13 @@ export default function AddJourney() {
     toStation: '',
     departureDate: '',
     departureTime: '',
+    departureTime12: '',
     arrivalDate: '',
     arrivalTime: '',
+    arrivalTime12: '',
     coachType: 'sleeper',
-    seatNumber: '',
-    availableCapacity: '5',
-    pricePerKg: '',
-    specialInstructions: ''
+    coachNumber: '',
+    seatNumber: ''
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -39,6 +41,7 @@ export default function AddJourney() {
     // Clear PNR error when user starts typing
     if (name === 'pnr') {
       setPnrError('');
+      setIsPnrFetched(false); // Reset fetch status when PNR is changed
       // Real-time PNR format validation
       if (value.length === 10) {
         const validation = validatePNRFormat(value);
@@ -46,21 +49,6 @@ export default function AddJourney() {
           setPnrError(validation.error || 'Invalid PNR format');
         }
       }
-    }
-  };
-
-  const checkPNRExists = async (pnr: string): Promise<boolean> => {
-    try {
-      // TODO: Replace with actual Supabase API call to check if PNR exists
-      // For now, simulate checking against existing PNRs
-      const existingPNRs = ['PNR123456789', 'PNR987654321']; // Mock existing PNRs
-      
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API delay
-      
-      return existingPNRs.includes(pnr);
-    } catch (error) {
-      console.error('Error checking PNR:', error);
-      return false;
     }
   };
 
@@ -96,24 +84,96 @@ export default function AddJourney() {
         return;
       }
       
-      // Format dates for form inputs
-      const departureDate = pnrData.journeyDate.toISOString().split('T')[0];
-      const arrivalDate = pnrData.arrivalDate ? pnrData.arrivalDate.toISOString().split('T')[0] : departureDate;
-      
+      // Extract time information from the API response
+      function splitDateTime(rawDate: string | Date | any) {
+        if (!rawDate) {
+          return { date: "", time: "", time12: "" }; // fallback
+        }
+
+        let date: Date;
+        try {
+          if (rawDate instanceof Date) {
+            date = rawDate;
+          } else if (typeof rawDate === 'string') {
+            // Manual parse strings like "Nov 7, 2025 8:05:00 AM"
+            const m = rawDate.trim().match(/^(\w{3})\s+(\d{1,2}),\s*(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)$/i);
+            if (m) {
+              const [, monStr, dStr, yStr, hStr, minStr, secStr, ampm] = m;
+              const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11} as const;
+              const mon = months[monStr as keyof typeof months];
+              const y = parseInt(yStr,10);
+              const d = parseInt(dStr,10);
+              let h = parseInt(hStr,10) % 12; // 12 AM -> 0, 12 PM -> 12
+              if (ampm.toUpperCase() === 'PM') h += 12;
+              const min = parseInt(minStr,10);
+              const sec = secStr ? parseInt(secStr,10) : 0;
+              // Construct in local time (API is IST; we are not shifting timezones)
+              date = new Date(y, mon, d, h, min, sec);
+            } else {
+              // Fallback to native parser if regex fails
+              date = new Date(rawDate);
+            }
+          } else {
+            date = new Date(rawDate);
+          }
+
+          if (isNaN(date.getTime())) {
+            console.warn('Invalid date:', rawDate);
+            return { date: "", time: "", time12: "" }; // fallback
+          }
+
+          // For HTML input[type=date] and input[type=time], values must be:
+          // - date: yyyy-MM-dd
+          // - time: HH:mm (24h)
+          const yyyy = date.getFullYear();
+          const mm = String(date.getMonth() + 1).padStart(2, '0');
+          const dd = String(date.getDate()).padStart(2, '0');
+          const HH = String(date.getHours()).padStart(2, '0');
+          const MM = String(date.getMinutes()).padStart(2, '0');
+          const dateForInput = `${yyyy}-${mm}-${dd}`;
+          const timeForInput = `${HH}:${MM}`;
+          // Also provide a 12-hour display string with AM/PM for UI hints
+          const hour12 = (Number(HH) % 12) || 12;
+          const ampm = Number(HH) >= 12 ? 'PM' : 'AM';
+          const time12 = `${String(hour12).padStart(2,'0')}:${MM} ${ampm}`;
+
+          console.log('Parsed date/time for inputs:', { rawDate, dateForInput, timeForInput });
+
+          return {
+            date: dateForInput,
+            time: timeForInput,
+            time12,
+          };
+        } catch (error) {
+          console.warn('Error parsing date/time:', rawDate, error);
+          return { date: "", time: "", time12: "" };
+        }
+      }
+
+
       // Auto-populate form with real PNR data
+      // getPNRData returns journeyDate/arrivalDate as Date objects
+  const departure = splitDateTime(pnrData.dateOfJourneyRaw || pnrData.journeyDate || pnrData.dateOfJourney);
+  const arrival = splitDateTime(pnrData.arrivalDateRaw || pnrData.arrivalDate);
+
       setFormData(prev => ({
         ...prev,
         trainNumber: pnrData.trainNumber,
         trainName: pnrData.trainName,
         fromStation: pnrData.sourceStation,
         toStation: pnrData.destinationStation,
-        departureDate,
-        departureTime: '16:30', // Default time as API might not provide exact times
-        arrivalDate,
-        arrivalTime: '08:35', // Default time as API might not provide exact times
-        coachType: pnrData.class.toLowerCase().includes('ac') ? 'ac3' : 'sleeper',
-        seatNumber: pnrData.seatNumber || ''
+        departureDate: departure.date || '',
+        departureTime: departure.time || '',
+        departureTime12: departure.time12 || '',
+        arrivalDate: arrival.date || '',
+        arrivalTime: arrival.time || '',
+        arrivalTime12: arrival.time12 || '',
+        coachType: pnrData.journeyClass,
+        coachNumber: (pnrData.coachNumber ? String(pnrData.coachNumber) : (pnrData.passengerList?.[0]?.currentCoachId || pnrData.passengerList?.[0]?.bookingCoachId || '')),
+        seatNumber: (pnrData.seatNumber ? String(pnrData.seatNumber) : (pnrData.passengerList?.[0]?.currentBerthNo?.toString() || pnrData.passengerList?.[0]?.bookingBerthNo?.toString() || ''))
       }));
+ 
+      setIsPnrFetched(true);
       
     } catch (error) {
       console.error('Error looking up PNR:', error);
@@ -137,14 +197,35 @@ export default function AddJourney() {
         return;
       }
       
-      // TODO: Replace with actual Supabase API call
-      console.log('Creating journey:', formData);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Redirect to journeys page
-      router.push('/dashboard/carrier/journeys');
+      // Create journey using the service
+      if (!user?.id) {
+        setPnrError('User authentication error. Please log in again.');
+        setLoading(false);
+        return;
+      }
+
+      const result = await createJourney(user.id, {
+        pnr: formData.pnr,
+        trainNumber: formData.trainNumber,
+        trainName: formData.trainName,
+        fromStation: formData.fromStation,
+        toStation: formData.toStation,
+        departureDate: formData.departureDate,
+        departureTime: formData.departureTime,
+        arrivalDate: formData.arrivalDate,
+        arrivalTime: formData.arrivalTime,
+        coachType: formData.coachType,
+        coachNumber: formData.coachNumber,
+        seatNumber: formData.seatNumber
+      });
+
+      if (result.success) {
+        // Redirect to journeys page on success
+        router.push('/dashboard/carrier/journeys');
+      } else {
+        // Show error message
+        setPnrError(result.error || 'Failed to create journey. Please try again.');
+      }
     } catch (error) {
       console.error('Error creating journey:', error);
     } finally {
@@ -217,7 +298,14 @@ export default function AddJourney() {
 
             {/* Train Information */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Train Details</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                Train Details
+                {isPnrFetched && (
+                  <span className="ml-2 text-sm text-green-600 font-normal">
+                    ✓ Fetched from PNR
+                  </span>
+                )}
+              </h2>
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -229,7 +317,10 @@ export default function AddJourney() {
                     required
                     value={formData.trainNumber}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isPnrFetched}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      isPnrFetched ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
                     placeholder="e.g., 12345"
                   />
                 </div>
@@ -243,7 +334,10 @@ export default function AddJourney() {
                     required
                     value={formData.trainName}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isPnrFetched}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      isPnrFetched ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
                     placeholder="e.g., Rajdhani Express"
                   />
                 </div>
@@ -252,7 +346,14 @@ export default function AddJourney() {
 
             {/* Route Information */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Route Information</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                Route Information
+                {isPnrFetched && (
+                  <span className="ml-2 text-sm text-green-600 font-normal">
+                    ✓ Fetched from PNR
+                  </span>
+                )}
+              </h2>
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -264,7 +365,10 @@ export default function AddJourney() {
                     required
                     value={formData.fromStation}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isPnrFetched}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      isPnrFetched ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
                     placeholder="e.g., New Delhi"
                   />
                 </div>
@@ -278,7 +382,10 @@ export default function AddJourney() {
                     required
                     value={formData.toStation}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isPnrFetched}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      isPnrFetched ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
                     placeholder="e.g., Mumbai Central"
                   />
                 </div>
@@ -287,7 +394,14 @@ export default function AddJourney() {
 
             {/* Schedule Information */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Schedule</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                Schedule
+                {isPnrFetched && (
+                  <span className="ml-2 text-sm text-green-600 font-normal">
+                    ✓ Fetched from PNR
+                  </span>
+                )}
+              </h2>
               <div className="grid md:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -299,7 +413,10 @@ export default function AddJourney() {
                     required
                     value={formData.departureDate}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isPnrFetched}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      isPnrFetched ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
                   />
                 </div>
                 <div>
@@ -312,8 +429,14 @@ export default function AddJourney() {
                     required
                     value={formData.departureTime}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isPnrFetched}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      isPnrFetched ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
                   />
+                  {isPnrFetched && formData.departureTime12 && (
+                    <p className="mt-1 text-xs text-gray-500">{formData.departureTime12} (12-hour)</p>
+                  )}
                 </div>
               </div>
               <div className="grid md:grid-cols-2 gap-4">
@@ -327,7 +450,10 @@ export default function AddJourney() {
                     required
                     value={formData.arrivalDate}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isPnrFetched}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      isPnrFetched ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
                   />
                 </div>
                 <div>
@@ -340,16 +466,29 @@ export default function AddJourney() {
                     required
                     value={formData.arrivalTime}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isPnrFetched}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      isPnrFetched ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
                   />
+                  {isPnrFetched && formData.arrivalTime12 && (
+                    <p className="mt-1 text-xs text-gray-500">{formData.arrivalTime12} (12-hour)</p>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Seat Information */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Seat Information</h2>
-              <div className="grid md:grid-cols-2 gap-4">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                Seat Information
+                {isPnrFetched && (
+                  <span className="ml-2 text-sm text-green-600 font-normal">
+                    ✓ Fetched from PNR
+                  </span>
+                )}
+              </h2>
+              <div className="grid md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Coach Type
@@ -358,7 +497,10 @@ export default function AddJourney() {
                     name="coachType"
                     value={formData.coachType}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isPnrFetched}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      isPnrFetched ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
                   >
                     <option value="sleeper">Sleeper (SL)</option>
                     <option value="ac3">AC 3 Tier (3A)</option>
@@ -370,6 +512,22 @@ export default function AddJourney() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Coach Number
+                  </label>
+                  <input
+                    type="text"
+                    name="coachNumber"
+                    value={formData.coachNumber}
+                    onChange={handleInputChange}
+                    disabled={isPnrFetched}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      isPnrFetched ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
+                    placeholder="e.g., S4, B1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Seat Number
                   </label>
                   <input
@@ -378,62 +536,19 @@ export default function AddJourney() {
                     required
                     value={formData.seatNumber}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., B1-25"
+                    disabled={isPnrFetched}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      isPnrFetched ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
+                    placeholder="e.g., 35, 25"
                   />
                 </div>
               </div>
-            </div>
-
-            {/* Delivery Information */}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Delivery Settings</h2>
-              <div className="grid md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Available Capacity (kg)
-                  </label>
-                  <input
-                    type="number"
-                    name="availableCapacity"
-                    required
-                    min="1"
-                    max="20"
-                    value={formData.availableCapacity}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., 5"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Price per KG (₹)
-                  </label>
-                  <input
-                    type="number"
-                    name="pricePerKg"
-                    required
-                    min="10"
-                    value={formData.pricePerKg}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., 50"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Special Instructions
-                </label>
-                <textarea
-                  name="specialInstructions"
-                  value={formData.specialInstructions}
-                  onChange={handleInputChange}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Any special instructions for parcel delivery..."
-                />
-              </div>
+              {isPnrFetched && (
+                <p className="mt-2 text-sm text-blue-600">
+                  Seat information has been automatically filled from your PNR details.
+                </p>
+              )}
             </div>
 
             {/* Submit Button */}
@@ -460,3 +575,6 @@ export default function AddJourney() {
     </div>
   );
 }
+
+
+

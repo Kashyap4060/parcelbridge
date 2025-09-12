@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { XMarkIcon, CreditCardIcon, WalletIcon } from '@heroicons/react/24/outline';
-import { useHybridAuth } from '../../hooks/useHybridAuth';
+import { useSimpleAuth } from '../../hooks/useSimpleAuth';
 import { toast } from 'react-hot-toast';
 
 interface PaymentModalProps {
@@ -24,7 +24,7 @@ export default function PaymentModal({
   parcelId,
   carrierId
 }: PaymentModalProps) {
-  const { user } = useHybridAuth();
+  const { user } = useSimpleAuth();
   const [isLoading, setIsLoading] = useState(false);
 
   if (!isOpen) return null;
@@ -48,7 +48,7 @@ export default function PaymentModal({
           amount,
           purpose,
           userEmail: user.email || '',
-          userName: user.fullName || user.firstName || user.email || '',
+          userName: `${user.firstName} ${user.lastName}`.trim() || user.email || '',
           ...(parcelId && { parcelId }),
           ...(carrierId && { carrierId })
         }),
@@ -72,9 +72,9 @@ export default function PaymentModal({
           : `Payment for parcel delivery`,
         order_id: orderData.id,
         prefill: {
-          name: user.fullName || user.firstName || user.email || '',
+          name: `${user.firstName} ${user.lastName}`.trim() || user.email || '',
           email: user.email || '',
-          contact: user.phoneNumber || ''
+          contact: user.phone || ''
         },
         theme: {
           color: '#2563EB'
@@ -240,3 +240,6 @@ export default function PaymentModal({
     </div>
   );
 }
+
+
+

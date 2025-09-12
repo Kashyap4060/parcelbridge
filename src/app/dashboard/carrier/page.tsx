@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useHybridAuth } from '@/hooks/useHybridAuth';
+import { useSimpleAuth } from '@/hooks/useSimpleAuth';
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { useCarrierVerification } from '../../../hooks/useCarrierVerification';
 import { CarrierVerificationBanner } from '../../../components/ui/CarrierVerificationBanner';
@@ -19,7 +19,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function CarrierDashboard() {
-  const { user } = useHybridAuth();
+  const { user } = useSimpleAuth();
   const { isLoading, isAuthorized } = useRequireRole('carrier');
   const {
     getParcelAcceptanceStatus,
@@ -66,7 +66,7 @@ export default function CarrierDashboard() {
     }
   ];
 
-  if (authLoading || isLoadingWallet) {
+  if (isLoading || isLoadingWallet) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -93,7 +93,7 @@ export default function CarrierDashboard() {
                 <h1 className="text-xl font-semibold text-gray-900">
                   Carrier Dashboard
                 </h1>
-                <p className="text-sm text-gray-500">Welcome back, {user.user_metadata?.display_name || user.email || 'Carrier'}</p>
+                <p className="text-sm text-gray-500">Welcome back, {user.firstName + ' ' + user.lastName || user.firstName || user.email || 'Carrier'}</p>
               </div>
             </div>
             <Button onClick={() => router.push('/dashboard/carrier/journeys')}>
@@ -285,3 +285,6 @@ export default function CarrierDashboard() {
     </div>
   );
 }
+
+
+

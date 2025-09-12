@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useHybridAuth } from '@/hooks/useHybridAuth';
+import { useSimpleAuth } from '@/hooks/useSimpleAuth';
 import { Button } from '@/components/ui/Button';
 import { PlusIcon, ArchiveBoxIcon, MapPinIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { getSenderParcelRequests } from '@/lib/parcelRequests';
@@ -24,7 +24,7 @@ interface ParcelRequest {
 }
 
 export default function SenderRequests() {
-  const { user, isAuthenticated } = useHybridAuth();
+  const { user, isAuthenticated } = useSimpleAuth();
   const router = useRouter();
   const [requests, setRequests] = useState<ParcelRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +35,7 @@ export default function SenderRequests() {
       return;
     }
 
-    if (user?.role !== 'sender' && user?.user_metadata?.role !== 'sender') {
+    if (user?.role !== 'sender') {
       router.push('/dashboard');
       return;
     }
@@ -200,3 +200,6 @@ export default function SenderRequests() {
     </div>
   );
 }
+
+
+

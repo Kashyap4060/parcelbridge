@@ -27,3 +27,6 @@ export const auth = getAuth(app);
 export { RecaptchaVerifier, signInWithPhoneNumber };
 
 export default app;
+
+
+

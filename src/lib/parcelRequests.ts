@@ -22,12 +22,63 @@ export interface ParcelRequestRow {
   updated_at: string;
 }
 
-export async function getSenderParcelRequests(senderId: string) {
+export interface CreateParcelRequestData {
+  senderId: string;
+  fromStationCode: string;
+  fromStationName: string;
+  toStationCode: string;
+  toStationName: string;
+  receiverName: string;
+  receiverPhone: string;
+  weight: number;
+  length: number;
+  breadth: number;
+  height: number;
+  parcelType: string;
+  description?: string;
+}
+
+export async function createParcelRequest(data: CreateParcelRequestData): Promise<ParcelRequestRow> {
+  try {
+    const response = await fetch('/api/parcel-requests', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to create parcel request');
+    }
+
+    const result = await response.json();
+    return result as ParcelRequestRow;
+  } catch (error) {
+    console.error('API call error:', error);
+    throw error;
+  }
+}
+
+export async function getSenderParcelRequests(firebaseUid: string) {
+  // First, find the user profile ID from Firebase UID
+  const { data: userProfile, error: profileError } = await supabase
+    .from('user_profiles')
+    .select('id')
+    .eq('firebase_uid', firebaseUid)
+    .single();
+
+  if (profileError || !userProfile) {
+    throw new Error('User profile not found');
+  }
+
   const { data, error } = await supabase
     .from('parcel_requests')
     .select('*')
-    .eq('sender_id', senderId)
+    .eq('sender_id', userProfile.id)
     .order('created_at', { ascending: false });
+  
   if (error) throw error;
   return (data || []) as ParcelRequestRow[];
 }
@@ -41,5 +92,8 @@ export async function getPendingParcelRequests() {
   if (error) throw error;
   return (data || []) as ParcelRequestRow[];
 }
+
+
+
 
 

@@ -5,12 +5,15 @@
 import { supabase } from './supabase';
 
 export interface Station {
+  id?: string;
   name: string;
   code: string;
-  lat: number;
-  lng: number;
+  latitude?: number;
+  longitude?: number;
   state?: string;
   zone?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface StationDistance {
@@ -25,7 +28,7 @@ export interface StationDistance {
 export async function searchStations(searchTerm: string): Promise<Station[]> {
   try {
     const { data, error } = await supabase
-      .from('stations')
+      .from('railway_stations')
       .select('*')
       .or(`name.ilike.%${searchTerm}%,code.ilike.%${searchTerm}%`)
       .limit(20);
@@ -48,7 +51,7 @@ export async function searchStations(searchTerm: string): Promise<Station[]> {
 export async function getStationByCode(code: string): Promise<Station | null> {
   try {
     const { data, error } = await supabase
-      .from('stations')
+      .from('railway_stations')
       .select('*')
       .eq('code', code.toUpperCase())
       .single();
@@ -97,7 +100,7 @@ export async function getStationDistance(fromCode: string, toCode: string): Prom
 export async function addStations(stations: Station[]): Promise<boolean> {
   try {
     const { error } = await supabase
-      .from('stations')
+      .from('railway_stations')
       .insert(stations);
 
     if (error) {
@@ -118,7 +121,7 @@ export async function addStations(stations: Station[]): Promise<boolean> {
 export async function getAllStations(): Promise<Station[]> {
   try {
     const { data, error } = await supabase
-      .from('stations')
+      .from('railway_stations')
       .select('*')
       .order('name');
 
@@ -154,3 +157,6 @@ export async function addStationDistances(distances: StationDistance[]): Promise
     return false;
   }
 }
+
+
+

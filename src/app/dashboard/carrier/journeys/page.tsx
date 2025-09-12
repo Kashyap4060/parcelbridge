@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useHybridAuth } from '@/hooks/useHybridAuth';
+import { useSimpleAuth } from '@/hooks/useSimpleAuth';
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { getJourneysByCarrier, deleteJourneyById } from '@/lib/journeys';
 import { Button } from '@/components/ui/Button';
@@ -26,7 +26,7 @@ interface Journey {
 }
 
 export default function CarrierJourneys() {
-  const { user, isAuthenticated } = useHybridAuth();
+  const { user, isAuthenticated } = useSimpleAuth();
   const { isLoading, isAuthorized } = useRequireRole('carrier');
   const router = useRouter();
   const [journeys, setJourneys] = useState<Journey[]>([]);
@@ -197,3 +197,6 @@ export default function CarrierJourneys() {
     </div>
   );
 }
+
+
+

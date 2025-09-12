@@ -1,407 +1,338 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import dynamic from 'next/dynamic';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useHybridAuth } from '@/hooks/useHybridAuth';
+import { useSimpleAuth } from '@/hooks/useSimpleAuth';
 import { useRequireRole } from '@/hooks/useRequireRole';
-import { getActiveJourneysByCarrier } from '@/lib/journeys';
-import { getPendingParcelRequests } from '@/lib/parcelRequests';
-const JourneyVerificationComponent = dynamic(
-  () => import('../../../../components/JourneyVerificationComponent').then(m => m.JourneyVerificationComponent),
-  { ssr: false, loading: () => <div className="p-6">Loading verification...</div> }
-);
-import { ParcelRequest, Journey } from '../../../../types';
-import { Button } from '../../../../components/ui/Button';
-import { formatCurrency } from '../../../../lib/utils';
-import {
-  MapPinIcon,
-  ClockIcon,
-  TruckIcon,
-  CheckCircleIcon,
-  XCircleIcon,
+import { parcelMatchingService, ParcelMatch, CarrierParcelStatus } from '@/lib/parcelMatchingService';
+import { Button } from '@/components/ui/Button';
+import { 
+  TruckIcon, 
+  MapPinIcon, 
+  ClockIcon, 
+  CurrencyRupeeIcon,
   ExclamationTriangleIcon,
-  MagnifyingGlassIcon,
-  FunnelIcon,
-  EyeIcon
+  CheckCircleIcon,
+  XCircleIcon
 } from '@heroicons/react/24/outline';
+import { toast } from 'react-hot-toast';
 
-interface ParcelWithVerification extends ParcelRequest {
-  verificationStatus?: 'APPROVED' | 'ROUTE_MISMATCH' | 'REQUIREMENTS_PENDING' | 'PENDING';
-  matchConfidence?: number;
+interface ParcelCardProps {
+  match: ParcelMatch;
+  onAccept: (parcelId: string, journeyId: string) => void;
+  carrierStatus: CarrierParcelStatus;
+  loading: boolean;
 }
 
-export default function CarrierParcelsPage() {
-  const { user } = useHybridAuth();
-  const { isLoading: authLoading, isAuthorized } = useRequireRole('carrier');
+const ParcelCard = ({ match, onAccept, carrierStatus, loading }: ParcelCardProps) => {
+  const { parcel, bestMatch } = match;
+  
+  const getMatchTypeColor = (matchType: string) => {
+    switch (matchType.toLowerCase()) {
+      case 'perfect':
+        return 'text-green-600 bg-green-50';
+      case 'good':
+        return 'text-blue-600 bg-blue-50';
+      case 'partial':
+        return 'text-amber-600 bg-amber-50';
+      default:
+        return 'text-gray-600 bg-gray-50';
+    }
+  };
+
+  const getMatchIcon = (matchType: string) => {
+    switch (matchType.toLowerCase()) {
+      case 'perfect':
+        return <CheckCircleIcon className="h-4 w-4" />;
+      case 'good':
+        return <CheckCircleIcon className="h-4 w-4" />;
+      case 'partial':
+        return <ExclamationTriangleIcon className="h-4 w-4" />;
+      default:
+        return <XCircleIcon className="h-4 w-4" />;
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">
+            Parcel #{parcel.id.slice(0, 8)}
+          </h3>
+          <p className="text-sm text-gray-500">
+            Posted {new Date(parcel.createdAt).toLocaleDateString()}
+          </p>
+        </div>
+        
+        {bestMatch && (
+          <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getMatchTypeColor(bestMatch.matchType)}`}>
+            {getMatchIcon(bestMatch.matchType)}
+            <span className="ml-1 capitalize">{bestMatch.matchType} Match ({bestMatch.confidence}%)</span>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center space-x-4 mb-4">
+        <div className="flex items-center text-gray-600">
+          <MapPinIcon className="h-4 w-4 mr-1" />
+          <span className="text-sm">{parcel.pickupStation}</span>
+        </div>
+        <div className="text-gray-400">→</div>
+        <div className="flex items-center text-gray-600">
+          <MapPinIcon className="h-4 w-4 mr-1" />
+          <span className="text-sm">{parcel.dropStation}</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div>
+          <p className="text-sm text-gray-500">Weight</p>
+          <p className="font-medium">{parcel.weight}kg</p>
+        </div>
+        <div>
+          <p className="text-sm text-gray-500">Dimensions</p>
+          <p className="font-medium">{parcel.dimensions.length}×{parcel.dimensions.width}×{parcel.dimensions.height}cm</p>
+        </div>
+        <div>
+          <p className="text-sm text-gray-500">Fee</p>
+          <div className="flex items-center">
+            <CurrencyRupeeIcon className="h-4 w-4" />
+            <span className="font-semibold text-green-600">₹{parcel.estimatedFare}</span>
+          </div>
+        </div>
+        <div>
+          <p className="text-sm text-gray-500">Pickup Time</p>
+          <div className="flex items-center">
+            <ClockIcon className="h-4 w-4 mr-1" />
+            <span className="text-sm">{new Date(parcel.pickupTime).toLocaleDateString()}</span>
+          </div>
+        </div>
+      </div>
+
+      {parcel.description && (
+        <div className="mb-4">
+          <p className="text-sm text-gray-500 mb-1">Description</p>
+          <p className="text-sm text-gray-700">{parcel.description}</p>
+        </div>
+      )}
+
+      {bestMatch && (
+        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+          <p className="text-sm font-medium text-gray-700 mb-2">Why this matches:</p>
+          <ul className="text-sm text-gray-600 space-y-1">
+            {bestMatch.reasons.map((reason, index) => (
+              <li key={index} className="flex items-start">
+                <span className="text-blue-500 mr-2">•</span>
+                {reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="flex justify-between items-center">
+        <div className="text-sm text-gray-500">
+          {!carrierStatus.canAcceptNew && (
+            <span className="text-amber-600">
+              <ExclamationTriangleIcon className="h-4 w-4 inline mr-1" />
+              You already have an active parcel
+            </span>
+          )}
+        </div>
+        
+        <Button
+          onClick={() => bestMatch && onAccept(parcel.id, bestMatch.journey.id)}
+          disabled={!bestMatch?.canAccept || !carrierStatus.canAcceptNew || loading}
+          className="px-4 py-2"
+        >
+          {loading ? (
+            <div className="flex items-center">
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+              Accepting...
+            </div>
+          ) : (
+            <div className="flex items-center">
+              <TruckIcon className="h-4 w-4 mr-2" />
+              Accept Parcel
+            </div>
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+export default function BrowseParcelsPage() {
+  const { user } = useSimpleAuth();
   const router = useRouter();
-  const [parcels, setParcels] = useState<ParcelWithVerification[]>([]);
-  const [activeJourneys, setActiveJourneys] = useState<Journey[]>([]);
-  const [selectedParcel, setSelectedParcel] = useState<ParcelRequest | null>(null);
-  const [selectedJourney, setSelectedJourney] = useState<Journey | null>(null);
+  const [matches, setMatches] = useState<ParcelMatch[]>([]);
+  const [carrierStatus, setCarrierStatus] = useState<CarrierParcelStatus>({ 
+    hasActiveParcel: false, 
+    canAcceptNew: false 
+  });
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [acceptingParcel, setAcceptingParcel] = useState<string | null>(null);
+  const [filterConfidence, setFilterConfidence] = useState(0);
 
-  // Authentication guard
-  useEffect(() => {}, []);
+  const { isLoading: roleLoading } = useRequireRole('carrier');
 
-  // Load parcels and journeys with useCallback to prevent infinite re-renders
-  const loadData = useCallback(async () => {
-    if (!user?.id) return;
+  useEffect(() => {
+    if (user && !roleLoading) {
+      loadMatches();
+      checkCarrierStatus();
+    }
+  }, [user, roleLoading]);
+
+  const loadMatches = async () => {
     try {
       setLoading(true);
-
-      const [parcelsData, journeysData] = await Promise.all([
-        getPendingParcelRequests(),
-        getActiveJourneysByCarrier(user.id)
-      ]);
-
-      const mappedParcels: ParcelRequest[] = parcelsData.map((p) => ({
-        id: p.id,
-        senderUid: p.sender_id,
-        pickupStation: p.pickup_station,
-        dropStation: p.drop_station,
-        weight: Number(p.weight),
-        dimensions: { length: Number(p.length ?? 0), width: Number(p.width ?? 0), height: Number(p.height ?? 0) },
-        pickupTime: new Date(p.pickup_time),
-        description: p.description || '',
-        status: p.status,
-        paymentHeld: Number(p.payment_held ?? 0),
-        estimatedFare: Number(p.estimated_fare),
-        feeBreakdown: p.fee_breakdown || null,
-        createdAt: new Date(p.created_at),
-        updatedAt: new Date(p.updated_at)
-      }));
-
-      const mappedJourneys: Journey[] = journeysData.map((j) => ({
-        id: j.id,
-        carrierUid: j.carrier_id,
-        pnr: j.pnr,
-        trainNumber: j.train_number,
-        trainName: j.train_name || '',
-        sourceStation: j.source_station,
-        sourceStationCode: j.source_station_code,
-        destinationStation: j.destination_station,
-        destinationStationCode: j.destination_station_code,
-        stations: j.stations || [],
-        journeyDate: new Date(j.journey_date),
-        departureTime: j.departure_time || '',
-        arrivalTime: j.arrival_time || '',
-        isActive: j.is_active,
-        createdAt: new Date(j.created_at)
-      }));
-
-      setParcels(mappedParcels);
-      setActiveJourneys(mappedJourneys);
+      if (!user?.id) return;
+      
+      const matchingParcels = await parcelMatchingService.findMatchingParcels(user.id);
+      setMatches(matchingParcels);
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('Error loading parcel matches:', error);
+      toast.error('Failed to load parcels');
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
-
-  useEffect(() => {
-    if (user?.id) {
-      loadData();
-    }
-  }, [user?.id, loadData]);
-
-  const getVerificationStatus = (parcel: ParcelRequest, journey: Journey) => {
-    // This would use the journey verification service
-    // For now, returning mock status based on stations
-    if (journey.sourceStation === parcel.pickupStation || 
-        journey.destinationStation === parcel.dropStation ||
-        journey.stations.some(station => 
-          parcel.pickupStation.includes(station) || 
-          parcel.dropStation.includes(station)
-        )) {
-      return { status: 'APPROVED', confidence: 85 };
-    }
-    return { status: 'ROUTE_MISMATCH', confidence: 20 };
   };
 
-  const filteredParcels = parcels.filter(parcel => {
-    const matchesSearch = parcel.pickupStation.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         parcel.dropStation.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         parcel.description.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    if (filterStatus === 'all') return matchesSearch;
-    if (filterStatus === 'compatible') {
-      return matchesSearch && activeJourneys.some(journey => {
-        const status = getVerificationStatus(parcel, journey);
-        return status.status === 'APPROVED';
-      });
-    }
-    return matchesSearch;
-  });
-
-  const handleViewParcel = (parcel: ParcelRequest) => {
-    if (activeJourneys.length === 0) {
-      alert('Please add a journey first to view parcel compatibility.');
-      router.push('/dashboard/carrier/journeys');
-      return;
-    }
-    
-    setSelectedParcel(parcel);
-    setSelectedJourney(activeJourneys[0]); // Use first active journey
-    setShowVerificationModal(true);
-  };
-
-  const handleAcceptParcel = async (parcel: ParcelRequest) => {
+  const checkCarrierStatus = async () => {
     try {
-      // Here you would call the parcel acceptance API
-      alert(`Parcel ${parcel.id} accepted successfully!`);
-      setShowVerificationModal(false);
-      loadData(); // Refresh data
+      if (!user?.id) return;
+      
+      const status = await parcelMatchingService.getCarrierParcelStatus(user.id);
+      setCarrierStatus(status);
     } catch (error) {
-      console.error('Failed to accept parcel:', error);
-      alert('Failed to accept parcel. Please try again.');
+      console.error('Error checking carrier status:', error);
     }
   };
 
-  if (authLoading || loading) {
+  const handleAcceptParcel = async (parcelId: string, journeyId: string) => {
+    try {
+      setAcceptingParcel(parcelId);
+      
+      if (!user?.id) {
+        toast.error('User not authenticated');
+        return;
+      }
+
+      await parcelMatchingService.acceptParcel(user.id, parcelId, journeyId);
+      toast.success('Parcel accepted successfully!');
+      
+      await Promise.all([loadMatches(), checkCarrierStatus()]);
+      
+    } catch (error) {
+      console.error('Error accepting parcel:', error);
+      toast.error('Failed to accept parcel');
+    } finally {
+      setAcceptingParcel(null);
+    }
+  };
+
+  if (roleLoading || loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex justify-center items-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading parcels...</p>
+          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading parcels...</p>
         </div>
       </div>
     );
   }
 
-  if (authLoading || !isAuthorized || !user) {
-    return null;
-  }
+  const filteredMatches = matches.filter(match => 
+    match.bestMatch && match.bestMatch.confidence >= filterConfidence
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Browse Parcels</h1>
-              <p className="text-gray-600 mt-1">Find delivery opportunities that match your journey</p>
-            </div>
-            <Button onClick={() => router.push('/dashboard/carrier')}>
-              Back to Dashboard
-            </Button>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mb-8">
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Browse Parcels</h1>
+            <p className="text-gray-600 mt-1">Find parcels that match your journey route</p>
           </div>
+          <Button onClick={loadMatches} variant="outline" className="flex items-center">
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+          </Button>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6">
-        {/* Active Journeys Alert */}
-        {activeJourneys.length === 0 && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600" />
-                <p className="ml-3 text-yellow-800">
-                  Add a journey to see compatible parcels.
-                </p>
+        {carrierStatus.hasActiveParcel && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center">
+              <ExclamationTriangleIcon className="h-5 w-5 text-amber-600 mr-3" />
+              <div>
+                <p className="text-amber-800 font-medium">You currently have an active parcel delivery</p>
+                <p className="text-amber-700 text-sm">You can only accept one parcel at a time.</p>
               </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => router.push('/dashboard/carrier/journeys')}
-              >
-                Add Journey
-              </Button>
             </div>
           </div>
         )}
 
-        {/* Search and Filters */}
-        <div className="bg-white rounded-lg shadow p-4 sm:p-6 mb-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
-              <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-3 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search by pickup/drop station or description..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <FunnelIcon className="h-5 w-5 text-gray-400" />
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+          <h3 className="text-sm font-medium text-gray-700 mb-3">Filter by Match Quality</h3>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { label: 'All Matches', value: 0 },
+              { label: 'Partial+ (50%+)', value: 50 },
+              { label: 'Good+ (70%+)', value: 70 },
+              { label: 'Perfect (85%+)', value: 85 }
+            ].map((filter) => (
+              <button
+                key={filter.value}
+                onClick={() => setFilterConfidence(filter.value)}
+                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                  filterConfidence === filter.value
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
               >
-                <option value="all">All Parcels</option>
-                <option value="compatible">Compatible Routes</option>
-              </select>
-            </div>
+                {filter.label}
+              </button>
+            ))}
           </div>
-        </div>
-
-        {/* Parcels Grid */}
-        <div className="grid gap-4 sm:gap-6">
-          {filteredParcels.map((parcel) => {
-            const compatibleJourneys = activeJourneys.filter(journey => {
-              const status = getVerificationStatus(parcel, journey);
-              return status.status === 'APPROVED';
-            });
-
-            return (
-              <div key={parcel.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-4 mb-4">
-                      <h3 className="text-lg font-semibold text-gray-900">#{parcel.id}</h3>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        compatibleJourneys.length > 0
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {compatibleJourneys.length > 0 ? 'Route Compatible' : 'No Route Match'}
-                      </span>
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <div>
-                        <h4 className="font-medium text-gray-900 mb-3">Route Details</h4>
-                        <div className="space-y-2">
-                          <div className="flex items-center space-x-2">
-                            <MapPinIcon className="h-4 w-4 text-green-600" />
-                            <span className="text-sm text-gray-600">Pickup:</span>
-                            <span className="font-medium">{parcel.pickupStation}</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <MapPinIcon className="h-4 w-4 text-red-600" />
-                            <span className="text-sm text-gray-600">Drop:</span>
-                            <span className="font-medium">{parcel.dropStation}</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <ClockIcon className="h-4 w-4 text-blue-600" />
-                            <span className="text-sm text-gray-600">Pickup:</span>
-                            <span className="font-medium">
-                              {new Date(parcel.pickupTime).toLocaleDateString()} at{' '}
-                              {new Date(parcel.pickupTime).toLocaleTimeString([], { 
-                                hour: '2-digit', 
-                                minute: '2-digit' 
-                              })}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4 className="font-medium text-gray-900 mb-3">Parcel Details</h4>
-                        <div className="space-y-2">
-                          <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Weight:</span>
-                            <span className="font-medium">{parcel.weight}kg</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Dimensions:</span>
-                            <span className="font-medium">
-                              {parcel.dimensions.length} × {parcel.dimensions.width} × {parcel.dimensions.height} cm
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Delivery Fee:</span>
-                            <span className="font-bold text-green-600">{formatCurrency(parcel.estimatedFare)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4">
-                      <p className="text-gray-700">{parcel.description}</p>
-                    </div>
-                  </div>
-
-                  <div className="ml-6 flex flex-col space-y-2">
-                    <Button
-                      onClick={() => handleViewParcel(parcel)}
-                      disabled={activeJourneys.length === 0}
-                      className="whitespace-nowrap"
-                    >
-                      <EyeIcon className="h-4 w-4 mr-2" />
-                      View Details
-                    </Button>
-                    
-                    {compatibleJourneys.length > 0 && (
-                      <Button
-                        variant="outline"
-                        onClick={() => handleAcceptParcel(parcel)}
-                        className="whitespace-nowrap"
-                      >
-                        <CheckCircleIcon className="h-4 w-4 mr-2" />
-                        Quick Accept
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-
-          {filteredParcels.length === 0 && (
-            <div className="text-center py-12">
-              <TruckIcon className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No parcels found</h3>
-              <p className="text-gray-600">
-                {searchTerm ? 'Try adjusting your search criteria' : 'Check back later for new delivery opportunities'}
-              </p>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Verification Modal */}
-      {showVerificationModal && selectedParcel && selectedJourney && user && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-          <div className="bg-white rounded-lg w-full max-w-[95vw] sm:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-gray-900">
-                  Parcel Verification - #{selectedParcel.id}
-                </h2>
-                <Button
-                  variant="ghost"
-                  onClick={() => setShowVerificationModal(false)}
-                >
-                  <XCircleIcon className="h-5 w-5" />
-                </Button>
-              </div>
-
-              <JourneyVerificationComponent
-                journey={selectedJourney}
-                parcel={selectedParcel}
-                carrierUid={user.id}
-                onVerificationComplete={(canAccept) => {
-                  if (canAccept) {
-                    console.log('Parcel can be accepted');
-                  }
-                }}
-              />
-
-              <div className="flex space-x-3 pt-6 border-t border-gray-200 mt-6">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowVerificationModal(false)}
-                  className="flex-1"
-                >
-                  Close
-                </Button>
-                <Button
-                  onClick={() => handleAcceptParcel(selectedParcel)}
-                  className="flex-1"
-                >
-                  Accept Parcel
-                </Button>
-              </div>
-            </div>
+      {filteredMatches.length === 0 ? (
+        <div className="text-center py-12">
+          <TruckIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No matching parcels found</h3>
+          <p className="text-gray-500 mb-4">
+            {matches.length === 0 
+              ? "There are no parcels that match your journey routes."
+              : "No parcels match your current filter criteria."
+            }
+          </p>
+          <div className="space-y-2 text-sm text-gray-500">
+            <p>• Make sure you have added your journey details</p>
+            <p>• Check if your journey route covers popular stations</p>
+            <p>• Try adjusting the match quality filter</p>
           </div>
+        </div>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {filteredMatches.map((match) => (
+            <ParcelCard
+              key={match.parcel.id}
+              match={match}
+              onAccept={handleAcceptParcel}
+              carrierStatus={carrierStatus}
+              loading={acceptingParcel === match.parcel.id}
+            />
+          ))}
+        </div>
+      )}
+
+      {matches.length > 0 && (
+        <div className="mt-8 text-center text-sm text-gray-500">
+          Showing {filteredMatches.length} of {matches.length} matching parcels
         </div>
       )}
     </div>

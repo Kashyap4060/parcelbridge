@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useHybridAuth } from '@/hooks/useHybridAuth';
+import { useSimpleAuth } from '@/hooks/useSimpleAuth';
 import { Button } from '@/components/ui/Button';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import UserProfileHeader from '@/components/UserProfileHeader';
@@ -12,12 +12,19 @@ import { TruckIcon, PaperAirplaneIcon, CogIcon, MapIcon, UserCircleIcon } from '
 export const dynamic = 'force-dynamic';
 
 function DashboardContent() {
-  const { user } = useHybridAuth();
+  const { user, updateUserRole } = useSimpleAuth();
   const router = useRouter();
   const [currentRole, setCurrentRole] = useState<string | null>(null);
+  const [updatingRole, setUpdatingRole] = useState(false);
 
   useEffect(() => {
     if (user) {
+      console.log('Dashboard - User data:', {
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+        hasSelectedRole: user.role ? true : false
+      });
       setCurrentRole(user.role || null);
     }
   }, [user]);
@@ -38,6 +45,93 @@ function DashboardContent() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
+          
+          {/* Debug Info - Remove this in production */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-6">
+              <h4 className="text-sm font-medium text-yellow-800">Debug Info (Dev Mode)</h4>
+              <p className="text-sm text-yellow-700 mt-1">
+                <strong>Email:</strong> {user.email}<br/>
+                <strong>Current Role:</strong> {currentRole || 'None'}<br/>
+                <strong>Phone:</strong> {user.phone || 'Not provided'}
+              </p>
+              {!currentRole && (
+                <div className="mt-2">
+                  <Button 
+                    size="sm" 
+                    onClick={() => router.push('/auth/complete-profile')}
+                    className="mr-2"
+                  >
+                    Complete Profile
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => router.push('/dashboard/profile')}
+                  >
+                    Manage Profile
+                  </Button>
+                </div>
+              )}
+              {currentRole && (
+                <div className="mt-2">
+                  <span className="text-sm text-yellow-700">
+                    Current role: <strong>{currentRole}</strong>
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Role Selection Prompt */}
+          {!currentRole && (
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-6">
+              <h3 className="text-lg font-medium text-blue-900 mb-2">
+                Welcome! Please Select Your Role
+              </h3>
+              <p className="text-blue-700 mb-4">
+                To access all features, please select whether you want to send parcels or carry them.
+              </p>
+              <div className="flex space-x-4">
+                <Button 
+                  onClick={async () => {
+                    setUpdatingRole(true);
+                    try {
+                      await updateUserRole('sender');
+                      setCurrentRole('sender');
+                    } catch (error) {
+                      console.error('Error updating role:', error);
+                    } finally {
+                      setUpdatingRole(false);
+                    }
+                  }}
+                  disabled={updatingRole}
+                  className="flex-1"
+                >
+                  {updatingRole ? 'Setting up...' : 'I want to Send Parcels'}
+                </Button>
+                <Button 
+                  onClick={async () => {
+                    setUpdatingRole(true);
+                    try {
+                      await updateUserRole('carrier');
+                      setCurrentRole('carrier');
+                    } catch (error) {
+                      console.error('Error updating role:', error);
+                    } finally {
+                      setUpdatingRole(false);
+                    }
+                  }}
+                  disabled={updatingRole}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  {updatingRole ? 'Setting up...' : 'I want to Carry Parcels'}
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Role-based content */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             
@@ -106,14 +200,13 @@ function DashboardContent() {
             {/* Carrier Dashboard */}
             {currentRole === 'carrier' && (
               <>
-                {/* Optional Aadhaar Verification Notice */}
-                {!user.isAadhaarVerified && (
-                  <div className="md:col-span-3">
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                      <div className="flex">
-                        <div className="flex-shrink-0">
-                          <svg className="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                {/* Optional Features Notice */}
+                <div className="md:col-span-3">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <svg className="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                         </div>
                         <div className="ml-3 flex-1">
@@ -138,7 +231,6 @@ function DashboardContent() {
                       </div>
                     </div>
                   </div>
-                )}
 
                 <div className="bg-white overflow-hidden shadow rounded-lg">
                   <div className="p-6">
@@ -165,11 +257,6 @@ function DashboardContent() {
                     </h3>
                     <p className="text-gray-600 mb-4">
                       Browse available delivery requests
-                      {!user.isAadhaarVerified && (
-                        <span className="block text-xs text-amber-600 mt-1">
-                          (Aadhaar verification required to accept)
-                        </span>
-                      )}
                     </p>
                     <Button
                       variant="outline"
@@ -215,3 +302,6 @@ export default function Dashboard() {
     </ProtectedRoute>
   );
 }
+
+
+

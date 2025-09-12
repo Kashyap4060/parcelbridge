@@ -20,3 +20,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   setLoading: (loading) => set({ isLoading: loading }),
   logout: () => set({ user: null, currentRole: null, isLoading: false }),
 }));
+
+
+

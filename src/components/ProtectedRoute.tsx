@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useHybridAuth } from '@/hooks/useHybridAuth';
+import { useSimpleAuth } from '@/hooks/useSimpleAuth';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -23,32 +23,18 @@ export default function ProtectedRoute({
   loadingComponent 
 }: ProtectedRouteProps) {
   const router = useRouter();
-  const { user, isLoading, isAuthenticated, sessionValid, validateAndRedirect } = useHybridAuth();
+  const { user, loading, isAuthenticated } = useSimpleAuth();
   const [isValidating, setIsValidating] = useState(true);
 
   useEffect(() => {
     const checkAccess = async () => {
-      if (isLoading) return;
+      if (loading) return;
 
       try {
         // If no user, redirect to login
         if (!user || !isAuthenticated) {
           router.replace(redirectTo);
           return;
-        }
-
-        // Validate session
-        if (!sessionValid) {
-          try {
-            await validateAndRedirect();
-            setIsValidating(false);
-          } catch (error) {
-            console.warn('Session validation failed, redirecting to login');
-            router.replace(redirectTo);
-            return;
-          }
-        } else {
-          setIsValidating(false);
         }
 
         // Check role requirement
@@ -58,6 +44,8 @@ export default function ProtectedRoute({
           return;
         }
 
+        setIsValidating(false);
+
       } catch (error) {
         console.error('Error in protected route check:', error);
         router.replace(redirectTo);
@@ -65,10 +53,10 @@ export default function ProtectedRoute({
     };
 
     checkAccess();
-  }, [user, isLoading, isAuthenticated, sessionValid, requireRole, router, redirectTo, validateAndRedirect]);
+  }, [user, loading, isAuthenticated, requireRole, router, redirectTo]);
 
   // Show loading state while checking authentication
-  if (isLoading || isValidating) {
+  if (loading || isValidating) {
     if (loadingComponent) {
       return <>{loadingComponent}</>;
     }
@@ -102,3 +90,6 @@ export function withProtectedRoute<P extends object>(
     );
   };
 }
+
+
+

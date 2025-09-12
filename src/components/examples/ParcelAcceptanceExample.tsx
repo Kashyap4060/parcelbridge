@@ -183,3 +183,6 @@ export function CarrierParcelCard({ parcel, carrierJourney, carrierUid }: {
     </>
   );
 }
+
+
+

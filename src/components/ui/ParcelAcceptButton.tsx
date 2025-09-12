@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useHybridAuth } from '../../hooks/useHybridAuth';
+import { useSimpleAuth } from '../../hooks/useSimpleAuth';
 import { useCarrierVerification } from '../../hooks/useCarrierVerification';
 import { acceptParcelWithCollateral, MINIMUM_COLLATERAL } from '../../lib/collateralService';
 import { Button } from './Button';
@@ -34,7 +34,7 @@ export function ParcelAcceptButton({
   senderName,
   className = ''
 }: ParcelAcceptButtonProps) {
-  const { user } = useHybridAuth();
+  const { user } = useSimpleAuth();
   const {
     canAcceptParcels,
     getParcelAcceptanceStatus,
@@ -62,7 +62,7 @@ export function ParcelAcceptButton({
 
     try {
       const result = await acceptParcelWithCollateral(
-        user.firebaseUid,
+        user.id,
         parcelId,
         walletBalance,
         lockedAmount
@@ -258,3 +258,6 @@ export function ParcelAcceptButton({
     </div>
   );
 }
+
+
+

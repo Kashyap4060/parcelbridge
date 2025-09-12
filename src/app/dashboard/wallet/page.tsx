@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useHybridAuth } from '../../../hooks/useHybridAuth';
+import { useSimpleAuth } from '../../../hooks/useSimpleAuth';
 import { useCarrierVerification } from '../../../hooks/useCarrierVerification';
 import { Button } from '../../../components/ui/Button';
 import { CollateralStatus } from '../../../components/ui/CollateralStatus';
@@ -21,7 +21,7 @@ interface WalletTransaction {
 }
 
 export default function WalletPage() {
-  const { user, isAuthenticated } = useHybridAuth();
+  const { user, isAuthenticated } = useSimpleAuth();
   const { 
     getCollateralStatus, 
     isLoadingWallet, 
@@ -390,3 +390,6 @@ export default function WalletPage() {
     </div>
   );
 }
+
+
+

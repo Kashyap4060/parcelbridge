@@ -6,7 +6,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useHybridAuth } from '@/hooks/useHybridAuth';
+import { useSimpleAuth } from '@/hooks/useSimpleAuth';
 import { ArrowsRightLeftIcon, TruckIcon, PaperAirplaneIcon } from '@heroicons/react/24/outline';
 
 interface RoleSwitcherProps {
@@ -15,17 +15,17 @@ interface RoleSwitcherProps {
 }
 
 export default function RoleSwitcher({ className = '', variant = 'default' }: RoleSwitcherProps) {
-  const { user, switchRole, isLoading } = useHybridAuth();
+  const { user, updateUserRole, loading } = useSimpleAuth();
   const [switching, setSwitching] = useState(false);
 
   const handleRoleToggle = async () => {
-    if (!user?.role || switching || isLoading) return;
+    if (!user?.role || switching || loading) return;
 
     const newRole = user.role === 'sender' ? 'carrier' : 'sender';
     
     try {
       setSwitching(true);
-      await switchRole(newRole);
+      await updateUserRole(newRole);
     } catch (error) {
       console.error('Failed to switch role:', error);
     } finally {
@@ -56,9 +56,9 @@ export default function RoleSwitcher({ className = '', variant = 'default' }: Ro
             <div 
               className={`w-7 h-7 bg-white rounded-full shadow-sm transition-all duration-300 ease-out transform flex items-center justify-center ${
                 currentRole === 'sender' ? 'translate-x-0' : 'translate-x-12'
-              } ${switching || isLoading ? 'scale-90' : 'hover:scale-105'}`}
+              } ${switching || loading ? 'scale-90' : 'hover:scale-105'}`}
             >
-              {switching || isLoading ? (
+              {switching || loading ? (
                 <div className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
               ) : (
                 <div className={`w-2 h-2 rounded-full transition-colors duration-300 ${
@@ -69,7 +69,7 @@ export default function RoleSwitcher({ className = '', variant = 'default' }: Ro
           </div>
           
           {/* Disabled overlay */}
-          {(switching || isLoading) && (
+          {(switching || loading) && (
             <div className="absolute inset-0 bg-gray-200 bg-opacity-30 rounded-full cursor-not-allowed"></div>
           )}
         </div>
@@ -103,9 +103,9 @@ export default function RoleSwitcher({ className = '', variant = 'default' }: Ro
             <div 
               className={`absolute top-1 w-16 h-8 bg-white rounded-full shadow-lg transition-all duration-300 ease-out transform flex items-center justify-center ${
                 currentRole === 'sender' ? 'translate-x-0' : 'translate-x-14'
-              } ${switching || isLoading ? 'scale-95' : 'hover:scale-105'}`}
+              } ${switching || loading ? 'scale-95' : 'hover:scale-105'}`}
             >
-              {switching || isLoading ? (
+              {switching || loading ? (
                 <svg className="w-4 h-4 animate-spin text-gray-600" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -137,7 +137,7 @@ export default function RoleSwitcher({ className = '', variant = 'default' }: Ro
           </div>
 
           {/* Disabled overlay */}
-          {(switching || isLoading) && (
+          {(switching || loading) && (
             <div className="absolute inset-0 bg-gray-200 bg-opacity-50 rounded-full cursor-not-allowed"></div>
           )}
         </div>
@@ -174,15 +174,15 @@ export default function RoleSwitcher({ className = '', variant = 'default' }: Ro
       <div className="mx-4">
         <button
           onClick={handleRoleToggle}
-          disabled={switching || isLoading}
+          disabled={switching || loading}
           className={`group relative p-3 rounded-full border-2 transition-all duration-300 ${
-            switching || isLoading
+            switching || loading
               ? 'border-gray-200 bg-gray-50 cursor-not-allowed'
               : 'border-gray-300 bg-white hover:border-gray-400 hover:bg-gray-50 cursor-pointer hover:scale-110 hover:rotate-180'
           }`}
           title={`Switch to ${otherRole}`}
         >
-          {switching || isLoading ? (
+          {switching || loading ? (
             <svg className="w-5 h-5 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -205,3 +205,6 @@ export default function RoleSwitcher({ className = '', variant = 'default' }: Ro
     </div>
   );
 }
+
+
+

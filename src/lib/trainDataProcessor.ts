@@ -203,3 +203,6 @@ export function prepareFirebaseData(
 
   return { stationsForUpload, distancesForUpload };
 }
+
+
+

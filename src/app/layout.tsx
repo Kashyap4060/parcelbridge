@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { HybridAuthProvider } from "@/hooks/useHybridAuth";
 import Script from 'next/script';
-import { Toaster } from 'react-hot-toast';
+import { ClientProviders } from '@/components/providers/ClientProviders';
 
 const inter = Inter({
   subsets: ["latin"],
@@ -84,23 +83,16 @@ export default function RootLayout({
         >
           Skip to content
         </a>
-        <HybridAuthProvider>
+        <ClientProviders>
           <main id="main-content" role="main" className="min-h-screen">
             {children}
           </main>
-        </HybridAuthProvider>
+        </ClientProviders>
         <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
-        <Toaster 
-          position="top-right"
-          toastOptions={{
-            duration: 4000,
-            style: {
-              background: '#363636',
-              color: '#fff',
-            },
-          }}
-        />
       </body>
     </html>
   );
 }
+
+
+
