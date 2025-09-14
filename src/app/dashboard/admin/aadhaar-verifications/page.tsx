@@ -136,7 +136,8 @@ export default function AadhaarVerificationsPage() {
   };
 
   if (!isAuthenticated || !user || !isAuthorized) {
-    return <div>Access denied</div>;
+    // Auth protection handled by layout - this should not be reached
+    return null;
   }
 
   return (

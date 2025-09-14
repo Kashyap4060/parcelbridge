@@ -1,0 +1,79 @@
+#!/bin/bash
+# Pre-commit hook to validate auth patterns
+# Install: cp pre-commit-auth-check .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+echo "🔍 Checking for auth anti-patterns..."
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Track if we found any issues
+ISSUES_FOUND=0
+
+# Check for hardcoded access denied messages
+echo "Checking for hardcoded 'Access denied' messages..."
+ACCESS_DENIED_FILES=$(git diff --cached --name-only | grep -E '\.(tsx?|jsx?)$' | xargs grep -l "Access denied" 2>/dev/null || true)
+
+if [ ! -z "$ACCESS_DENIED_FILES" ]; then
+    echo -e "${RED}❌ Found hardcoded 'Access denied' messages in:${NC}"
+    echo "$ACCESS_DENIED_FILES" | while read file; do
+        echo -e "${RED}  - $file${NC}"
+        grep -n "Access denied" "$file" | sed 's/^/    /'
+    done
+    ISSUES_FOUND=1
+fi
+
+# Check for manual auth checks pattern
+echo "Checking for manual authentication checks..."
+MANUAL_AUTH_FILES=$(git diff --cached --name-only | grep -E '\.(tsx?|jsx?)$' | xargs grep -l "!isAuthenticated.*user.*role" 2>/dev/null || true)
+
+if [ ! -z "$MANUAL_AUTH_FILES" ]; then
+    echo -e "${YELLOW}⚠️  Found manual auth checks in:${NC}"
+    echo "$MANUAL_AUTH_FILES" | while read file; do
+        echo -e "${YELLOW}  - $file${NC}"
+        echo -e "${YELLOW}    Consider using withAuthProtection HOC instead${NC}"
+    done
+fi
+
+# Check for ProtectedRoute usage (suggest migration)
+echo "Checking for legacy ProtectedRoute usage..."
+PROTECTED_ROUTE_FILES=$(git diff --cached --name-only | grep -E '\.(tsx?|jsx?)$' | xargs grep -l "<ProtectedRoute" 2>/dev/null || true)
+
+if [ ! -z "$PROTECTED_ROUTE_FILES" ]; then
+    echo -e "${YELLOW}📝 Found ProtectedRoute usage in:${NC}"
+    echo "$PROTECTED_ROUTE_FILES" | while read file; do
+        echo -e "${YELLOW}  - $file${NC}"
+        echo -e "${YELLOW}    Consider migrating to withAuthProtection HOC${NC}"
+    done
+fi
+
+# Check for components without proper auth protection
+echo "Checking for unprotected dashboard components..."
+DASHBOARD_FILES=$(git diff --cached --name-only | grep -E 'dashboard.*\.(tsx?|jsx?)$' | grep -v layout | grep -v _app || true)
+
+if [ ! -z "$DASHBOARD_FILES" ]; then
+    for file in $DASHBOARD_FILES; do
+        if ! grep -q "withAuthProtection\|ProtectedRoute\|AuthErrorBoundary" "$file" 2>/dev/null; then
+            echo -e "${YELLOW}⚠️  Dashboard component may need auth protection: $file${NC}"
+        fi
+    done
+fi
+
+# Final result
+if [ $ISSUES_FOUND -eq 1 ]; then
+    echo -e "\n${RED}❌ Commit blocked due to auth anti-patterns.${NC}"
+    echo -e "${RED}Please fix the issues above and commit again.${NC}"
+    echo ""
+    echo "Quick fixes:"
+    echo "1. Replace hardcoded 'Access denied' with AuthErrorBoundary"
+    echo "2. Use withAuthProtection HOC instead of manual auth checks"
+    echo "3. Ensure dashboard components are properly protected"
+    echo ""
+    exit 1
+else
+    echo -e "${GREEN}✅ Auth patterns look good!${NC}"
+    exit 0
+fi
