@@ -7,7 +7,8 @@ import { useRequireRole } from '@/hooks/useRequireRole';
 import { useCarrierVerification } from '../../../hooks/useCarrierVerification';
 import { CarrierVerificationBanner } from '../../../components/ui/CarrierVerificationBanner';
 import { CollateralStatus } from '../../../components/ui/CollateralStatus';
-import { Button } from '../../../components/ui/Button';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from '../../../lib/utils';
 import {
   TruckIcon,
@@ -117,41 +118,47 @@ export default function CarrierDashboard() {
           <div className="lg:col-span-2 space-y-6">
             {/* Stats Cards */}
             <div className="grid md:grid-cols-3 gap-4">
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center">
-                  <div className="p-3 bg-blue-100 rounded-full">
-                    <DocumentCheckIcon className="h-6 w-6 text-blue-600" />
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <div className="p-3 bg-blue-100 rounded-full">
+                      <DocumentCheckIcon className="h-6 w-6 text-blue-600" />
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-2xl font-bold text-gray-900">{activeDeliveries.length}</p>
+                      <p className="text-sm text-gray-600">Active Deliveries</p>
+                    </div>
                   </div>
-                  <div className="ml-4">
-                    <p className="text-2xl font-bold text-gray-900">{activeDeliveries.length}</p>
-                    <p className="text-sm text-gray-600">Active Deliveries</p>
-                  </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
 
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center">
-                  <div className="p-3 bg-green-100 rounded-full">
-                    <WalletIcon className="h-6 w-6 text-green-600" />
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <div className="p-3 bg-green-100 rounded-full">
+                      <WalletIcon className="h-6 w-6 text-green-600" />
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-2xl font-bold text-gray-900">{formatCurrency(walletBalance)}</p>
+                      <p className="text-sm text-gray-600">Wallet Balance</p>
+                    </div>
                   </div>
-                  <div className="ml-4">
-                    <p className="text-2xl font-bold text-gray-900">{formatCurrency(walletBalance)}</p>
-                    <p className="text-sm text-gray-600">Wallet Balance</p>
-                  </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
 
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center">
-                  <div className="p-3 bg-purple-100 rounded-full">
-                    <MapIcon className="h-6 w-6 text-purple-600" />
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <div className="p-3 bg-purple-100 rounded-full">
+                      <MapIcon className="h-6 w-6 text-purple-600" />
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-2xl font-bold text-gray-900">{upcomingJourneys.length}</p>
+                      <p className="text-sm text-gray-600">Upcoming Journeys</p>
+                    </div>
                   </div>
-                  <div className="ml-4">
-                    <p className="text-2xl font-bold text-gray-900">{upcomingJourneys.length}</p>
-                    <p className="text-sm text-gray-600">Upcoming Journeys</p>
-                  </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             </div>
 
             {/* Collateral Status */}
@@ -165,17 +172,17 @@ export default function CarrierDashboard() {
             />
 
             {/* Active Deliveries */}
-            <div className="bg-white rounded-lg shadow">
-              <div className="p-6 border-b border-gray-200">
+            <Card>
+              <CardHeader className="border-b border-gray-200">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-medium text-gray-900">Active Deliveries</h2>
+                  <CardTitle className="text-lg font-medium text-gray-900">Active Deliveries</CardTitle>
                   <Button variant="ghost" size="sm" onClick={() => router.push('/dashboard/deliveries')}>
                     <EyeIcon className="h-4 w-4 mr-2" />
                     View All
                   </Button>
                 </div>
-              </div>
-              <div className="divide-y divide-gray-200">
+              </CardHeader>
+              <CardContent className="divide-y divide-gray-200 p-0">
                 {activeDeliveries.map((delivery) => (
                   <div key={delivery.id} className="p-6">
                     <div className="flex items-center justify-between">
@@ -205,15 +212,17 @@ export default function CarrierDashboard() {
                     <p className="text-sm mt-2">Add a journey to start accepting parcels</p>
                   </div>
                 )}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Right Column - Quick Actions */}
           <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
-              <div className="space-y-3">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg font-medium text-gray-900">Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
                 <Button 
                   className="w-full justify-start" 
                   variant="outline"
@@ -240,18 +249,20 @@ export default function CarrierDashboard() {
                   <DocumentCheckIcon className="h-4 w-4 mr-2" />
                   View Deliveries
                 </Button>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
             {/* Upcoming Journeys */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Upcoming Journeys</h3>
-                <Button variant="ghost" size="sm" onClick={() => router.push('/dashboard/carrier/journeys')}>
-                  View All
-                </Button>
-              </div>
-              <div className="space-y-3">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg font-medium text-gray-900">Upcoming Journeys</CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => router.push('/dashboard/carrier/journeys')}>
+                    View All
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
                 {upcomingJourneys.map((journey) => (
                   <div key={journey.id} className="border border-gray-200 rounded-lg p-3">
                     <p className="font-medium text-sm text-gray-900">
@@ -277,14 +288,15 @@ export default function CarrierDashboard() {
                     </Button>
                   </div>
                 )}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
     </div>
   );
 }
+
 
 
 

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSimpleAuth } from '../../../hooks/useSimpleAuth';
 import { useCarrierVerification } from '../../../hooks/useCarrierVerification';
-import { Button } from '../../../components/ui/Button';
+import { Button } from '@/components/ui/button';
 import { CollateralStatus } from '../../../components/ui/CollateralStatus';
 import PaymentModal from '../../../components/ui/PaymentModal';
 import { ArrowLeftIcon, PlusIcon, CreditCardIcon } from '@heroicons/react/24/outline';
@@ -390,6 +390,7 @@ export default function WalletPage() {
     </div>
   );
 }
+
 
 
 

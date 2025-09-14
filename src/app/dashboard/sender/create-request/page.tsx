@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSimpleAuth } from '@/hooks/useSimpleAuth';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,10 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { StationSelector } from '@/components/ui/StationSelector';
 import { Station } from '@/lib/stationService';
 import { createParcelRequest } from '@/lib/parcelRequests';
+import { toast } from '@/hooks/use-toast';
 import { ArrowLeftIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
+import ProtectedRoute from '@/components/ProtectedRoute';
 
-export default function CreateRequest() {
+function CreateRequestContent() {
   const { user, isAuthenticated } = useSimpleAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -189,10 +191,6 @@ export default function CreateRequest() {
       setLoading(false);
     }
   };
-
-  if (!isAuthenticated || user?.role !== 'sender') {
-    return <div>Access denied</div>;
-  }
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -449,6 +447,15 @@ export default function CreateRequest() {
     </div>
   );
 }
+
+export default function CreateRequest() {
+  return (
+    <ProtectedRoute requireRole="sender">
+      <CreateRequestContent />
+    </ProtectedRoute>
+  );
+}
+
 
 
 

@@ -3,8 +3,19 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSimpleAuth } from '@/hooks/useSimpleAuth';
-import { Button } from '@/components/ui/Button';
-import { PlusIcon, ArchiveBoxIcon, MapPinIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ParcelRequestDialog } from "@/components/ui/parcel-request-dialog";
+import { PlusIcon, ArchiveBoxIcon, MapPinIcon, ClockIcon, EyeIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { getSenderParcelRequests } from '@/lib/parcelRequests';
 
 interface ParcelRequest {
@@ -28,6 +39,8 @@ export default function SenderRequests() {
   const router = useRouter();
   const [requests, setRequests] = useState<ParcelRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedRequest, setSelectedRequest] = useState<ParcelRequest | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -87,6 +100,31 @@ export default function SenderRequests() {
     }
   };
 
+  // Helper functions for table
+  const getStatusVariant = (status: string) => {
+    switch (status) {
+      case 'PENDING': return 'warning';
+      case 'ACCEPTED': return 'outline';
+      case 'IN_TRANSIT': return 'outline';
+      case 'DELIVERED': return 'success';
+      case 'CANCELLED': return 'error';
+      default: return 'outline';
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
+  const openDetailDialog = (request: ParcelRequest) => {
+    setSelectedRequest(request);
+    setDetailDialogOpen(true);
+  };
+
   if (!isAuthenticated || !user) {
     return <div>Loading...</div>;
   }
@@ -119,87 +157,124 @@ export default function SenderRequests() {
             </Button>
           </div>
         ) : (
-          <div className="grid gap-4 sm:gap-6">
-            {requests.map((request) => (
-              <div key={request.id} className="bg-white rounded-lg shadow p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {request.fromCity} → {request.toCity}
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      {request.weight} kg • {request.dimensions}
-                    </p>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(request.status)}`}>
-                    {request.status.replace('_', ' ')}
-                  </span>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-4 mb-4">
-                  <div className="flex items-start gap-3">
-                    <MapPinIcon className="h-5 w-5 text-gray-400 mt-1" />
-                    <div>
-                      <p className="font-medium text-gray-900">Pickup</p>
-                      <p className="text-sm text-gray-600">{request.pickupAddress}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <MapPinIcon className="h-5 w-5 text-gray-400 mt-1" />
-                    <div>
-                      <p className="font-medium text-gray-900">Delivery</p>
-                      <p className="text-sm text-gray-600">{request.deliveryAddress}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mb-4">
-                  <p className="text-sm text-gray-600 mb-2">Description:</p>
-                  <p className="text-gray-900">{request.description}</p>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
-                    <span className="flex items-center gap-1">
-                      <ClockIcon className="h-4 w-4" />
-                      {new Date(request.createdAt).toLocaleDateString()}
-                    </span>
-                    <span className="font-medium text-green-600">
-                      Offer: ₹{request.offerAmount}
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    {request.status === 'PENDING' && (
-                      <Button variant="outline" size="sm">
-                        Edit
-                      </Button>
-                    )}
-                    <Button size="sm">
-                      {request.status === 'DELIVERED' ? 'Rate Carrier' : 'Track'}
-                    </Button>
-                  </div>
-                </div>
-
-                {request.carrierName && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <p className="text-sm text-gray-600">
-                      Carrier: <span className="font-medium text-gray-900">{request.carrierName}</span>
-                      {request.trackingId && (
-                        <span className="ml-4">
-                          Tracking: <span className="font-mono text-blue-600">{request.trackingId}</span>
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                )}
+          <Card>
+            <CardHeader>
+              <CardTitle>Parcel Requests</CardTitle>
+              <CardDescription>
+                Track and manage your parcel delivery requests
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Route</TableHead>
+                      <TableHead>Package Details</TableHead>
+                      <TableHead>Addresses</TableHead>
+                      <TableHead>Offer Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Carrier Info</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {requests.map((request) => (
+                      <TableRow key={request.id}>
+                        <TableCell>
+                          <div className="font-medium text-gray-900">
+                            {request.fromCity} → {request.toCity}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {request.weight} kg
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {request.dimensions}
+                            </div>
+                            <div className="text-sm text-gray-600 mt-1">
+                              {request.description}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">Pickup:</div>
+                              <div className="text-sm text-gray-600">{request.pickupAddress}</div>
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">Delivery:</div>
+                              <div className="text-sm text-gray-600">{request.deliveryAddress}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-medium text-green-600">₹{request.offerAmount}</span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusVariant(request.status)}>
+                            {request.status.replace('_', ' ')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-gray-600">
+                            {formatDate(request.createdAt)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          {request.carrierName ? (
+                            <div className="space-y-1">
+                              <div className="text-sm font-medium text-gray-900">
+                                {request.carrierName}
+                              </div>
+                              {request.trackingId && (
+                                <div className="text-sm font-mono text-blue-600">
+                                  {request.trackingId}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-gray-400">Not assigned</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2 justify-end">
+                            {request.status === 'PENDING' && (
+                              <Button variant="outline" size="sm">
+                                <PencilIcon className="h-4 w-4 mr-1" />
+                                Edit
+                              </Button>
+                            )}
+                            <Button size="sm" onClick={() => openDetailDialog(request)}>
+                              <EyeIcon className="h-4 w-4 mr-1" />
+                              {request.status === 'DELIVERED' ? 'Rate' : 'Track'}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
-            ))}
-          </div>
+            </CardContent>
+          </Card>
         )}
+
+        {/* Parcel Request Detail Dialog */}
+        <ParcelRequestDialog
+          open={detailDialogOpen}
+          onOpenChange={setDetailDialogOpen}
+          request={selectedRequest}
+        />
       </div>
     </div>
   );
 }
+
 
 
 

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { UserRole } from '@/types';
-import { Button } from './Button';
+import { Button } from './button';
 
 interface RoleSelectionProps {
   onRoleSelect: (role: UserRole) => Promise<void>;
@@ -123,6 +123,7 @@ export function RoleSelection({ onRoleSelect, isLoading = false }: RoleSelection
     </div>
   );
 }
+
 
 
 

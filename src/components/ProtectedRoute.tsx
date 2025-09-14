@@ -19,7 +19,7 @@ interface ProtectedRouteProps {
 export default function ProtectedRoute({ 
   children, 
   requireRole,
-  redirectTo = '/',
+  redirectTo = '/auth/login',
   loadingComponent 
 }: ProtectedRouteProps) {
   const router = useRouter();
@@ -90,6 +90,7 @@ export function withProtectedRoute<P extends object>(
     );
   };
 }
+
 
 
 

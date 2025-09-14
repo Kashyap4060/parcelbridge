@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from './Button';
+import { Button } from './button';
 import { formatCurrency } from '../../lib/utils';
 import { 
   WalletIcon, 
@@ -162,6 +162,7 @@ export function CollateralStatus({
     </div>
   );
 }
+
 
 
 

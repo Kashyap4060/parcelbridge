@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSimpleAuth } from '@/hooks/useSimpleAuth';
 import { AadhaarVerificationComponent } from '@/components/AadhaarVerificationComponent';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import { TruckIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 
 export default function AadhaarVerification() {
@@ -121,6 +121,7 @@ export default function AadhaarVerification() {
     </div>
   );
 }
+
 
 
 

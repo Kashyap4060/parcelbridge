@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useJourneyVerification } from '@/hooks/useJourneyVerification';
 import { AadhaarVerificationComponent } from './AadhaarVerificationComponent';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import { ParcelRequest, Journey } from '@/types';
 import { AadhaarData } from '@/lib/aadhaarVerificationService';
 import {
@@ -383,6 +383,7 @@ export function JourneyVerificationComponent({
     </div>
   );
 }
+
 
 
 

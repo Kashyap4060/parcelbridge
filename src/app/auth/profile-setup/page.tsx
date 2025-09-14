@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSimpleAuth } from '@/hooks/useSimpleAuth';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 
 export default function ProfileSetup() {
@@ -181,6 +181,7 @@ export default function ProfileSetup() {
     </div>
   );
 }
+
 
 
 

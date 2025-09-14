@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useSimpleAuth } from '@/hooks/useSimpleAuth';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import { ModeToggle } from '@/components/mode-toggle';
 import { 
   PaperAirplaneIcon, 

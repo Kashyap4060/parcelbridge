@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useSimpleAuth } from '@/hooks/useSimpleAuth';
 import { notificationService, Notification } from '@/lib/notificationService';
 import { BellIcon, CheckCircleIcon, TruckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import { Button } from './ui/Button';
+import { Button } from '@/components/ui/button';
 
 export function NotificationBell() {
   const { user } = useSimpleAuth();

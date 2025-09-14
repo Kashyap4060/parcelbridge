@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Button } from './Button';
+import { Button } from './button';
 import { formatCurrency } from '../../lib/utils';
 import {
   ExclamationTriangleIcon,
@@ -131,6 +131,7 @@ export function CarrierVerificationBanner({
     </div>
   );
 }
+
 
 
 

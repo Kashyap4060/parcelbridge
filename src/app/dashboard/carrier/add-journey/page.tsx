@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSimpleAuth } from '@/hooks/useSimpleAuth';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,8 +12,9 @@ import { ArrowLeftIcon, TruckIcon, CheckCircleIcon } from '@heroicons/react/24/o
 import { getPNRData, validatePNRFormat, extractTimeInfo } from '@/lib/pnrService';
 import { createJourney, checkPNRExists } from '@/lib/journeyService';
 import { cn } from '@/lib/utils';
+import ProtectedRoute from '@/components/ProtectedRoute';
 
-export default function AddJourney() {
+function AddJourneyContent() {
   const { user, isAuthenticated } = useSimpleAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -237,10 +238,6 @@ export default function AddJourney() {
       setLoading(false);
     }
   };
-
-  if (!isAuthenticated || user?.role !== 'carrier') {
-    return <div>Access denied</div>;
-  }
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -605,6 +602,15 @@ export default function AddJourney() {
     </div>
   );
 }
+
+export default function AddJourney() {
+  return (
+    <ProtectedRoute requireRole="carrier">
+      <AddJourneyContent />
+    </ProtectedRoute>
+  );
+}
+
 
 
 

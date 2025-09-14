@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useAadhaarVerification } from '@/hooks/useAadhaarVerification';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import { aadhaarVerificationService, AadhaarData } from '@/lib/aadhaarVerificationService';
 import {
   CheckCircleIcon,
@@ -317,6 +317,7 @@ export function AadhaarVerificationComponent({
     </div>
   );
 }
+
 
 
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { TruckIcon, ShieldCheckIcon, CurrencyRupeeIcon, MapPinIcon, ClockIcon } from "@heroicons/react/24/outline";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/ui/button";
 
 export default function Home() {
   return (
@@ -238,6 +238,7 @@ export default function Home() {
     </main>
   );
 }
+
 
 
 

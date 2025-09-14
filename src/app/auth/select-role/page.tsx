@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSimpleAuth } from '@/hooks/useSimpleAuth';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 
 export default function SelectRolePage() {
   const router = useRouter();
@@ -149,6 +149,7 @@ export default function SelectRolePage() {
     </div>
   );
 }
+
 
 
 

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useSimpleAuth } from '@/hooks/useSimpleAuth';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import { UserIcon, EnvelopeIcon, PhoneIcon, CakeIcon } from '@heroicons/react/24/outline';
 
 export default function Profile() {
@@ -237,6 +237,7 @@ export default function Profile() {
     </div>
   );
 }
+
 
 
 

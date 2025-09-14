@@ -5,8 +5,20 @@ import { useRouter } from 'next/navigation';
 import { useSimpleAuth } from '@/hooks/useSimpleAuth';
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { getJourneysByCarrier, deleteJourneyById } from '@/lib/journeys';
-import { Button } from '@/components/ui/Button';
-import { PlusIcon, TruckIcon, MapPinIcon, CalendarIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { JourneyDetailsDialog } from "@/components/ui/journey-details-dialog";
+import { PlusIcon, TruckIcon, MapPinIcon, CalendarIcon, TrashIcon, EyeIcon, CogIcon } from '@heroicons/react/24/outline';
 
 interface Journey {
   id: string;
@@ -31,6 +43,43 @@ export default function CarrierJourneys() {
   const router = useRouter();
   const [journeys, setJourneys] = useState<Journey[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean;
+    journeyId: string | null;
+    journeyName: string;
+    acceptedParcels: number;
+  }>({
+    open: false,
+    journeyId: null,
+    journeyName: '',
+    acceptedParcels: 0,
+  });
+  const [deleting, setDeleting] = useState(false);
+  const [selectedJourney, setSelectedJourney] = useState<Journey | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+
+  // Helper functions
+  const getStatusVariant = (status: string) => {
+    switch (status) {
+      case 'ACTIVE': return 'success';
+      case 'COMPLETED': return 'outline';
+      case 'CANCELLED': return 'error';
+      default: return 'outline';
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
+  const formatTime = (timeStr: string) => {
+    if (!timeStr) return 'TBD';
+    return timeStr;
+  };
 
   useEffect(() => {
     if (isLoading || !isAuthorized) return;
@@ -70,23 +119,33 @@ export default function CarrierJourneys() {
     router.push('/dashboard/carrier/add-journey');
   };
 
-  const deleteJourney = async (journeyId: string, acceptedParcels: number) => {
-    if (acceptedParcels > 0) {
-      alert('Cannot delete journey with accepted parcels. Please complete or cancel existing parcels first.');
-      return;
-    }
+  const openDeleteDialog = (journey: Journey) => {
+    setDeleteDialog({
+      open: true,
+      journeyId: journey.id,
+      journeyName: `${journey.trainName} (${journey.trainNumber})`,
+      acceptedParcels: journey.acceptedParcels,
+    });
+  };
 
-    if (!confirm('Are you sure you want to delete this journey? This action cannot be undone.')) {
-      return;
-    }
+  const openDetailDialog = (journey: Journey) => {
+    setSelectedJourney(journey);
+    setDetailDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteDialog.journeyId) return;
 
     try {
-      await deleteJourneyById(journeyId, user!.id);
-
-      setJourneys(prev => prev.filter(j => j.id !== journeyId));
+      setDeleting(true);
+      await deleteJourneyById(deleteDialog.journeyId, user!.id);
+      setJourneys(prev => prev.filter(j => j.id !== deleteDialog.journeyId));
+      setDeleteDialog({ open: false, journeyId: null, journeyName: '', acceptedParcels: 0 });
     } catch (error) {
       console.error('Error deleting journey:', error);
-      alert('Failed to delete journey. Please try again.');
+      // Keep dialog open to show error - could add error state here
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -122,81 +181,140 @@ export default function CarrierJourneys() {
             </Button>
           </div>
         ) : (
-          <div className="grid gap-4 sm:gap-6">
-            {journeys.map((journey) => (
-              <div key={journey.id} className="bg-white rounded-lg shadow p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {journey.trainName} ({journey.trainNumber})
-                    </h3>
-                    <p className="text-sm text-gray-600">PNR: {journey.pnr}</p>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    journey.status === 'ACTIVE' 
-                      ? 'bg-green-100 text-green-800'
-                      : journey.status === 'COMPLETED'
-                      ? 'bg-blue-100 text-blue-800'
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {journey.status}
-                  </span>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-4 mb-4">
-                  <div className="flex items-center gap-3">
-                    <MapPinIcon className="h-5 w-5 text-gray-400" />
-                    <div>
-                      <p className="font-medium text-gray-900">{journey.fromStation}</p>
-                      <p className="text-sm text-gray-600">
-                        {journey.departureDate} at {journey.departureTime}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <MapPinIcon className="h-5 w-5 text-gray-400" />
-                    <div>
-                      <p className="font-medium text-gray-900">{journey.toStation}</p>
-                      <p className="text-sm text-gray-600">
-                        {journey.arrivalDate} at {journey.arrivalTime}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <div className="flex gap-4 text-sm text-gray-600">
-                    <span>Capacity: {journey.availableCapacity} kg</span>
-                    <span>Rate: ₹{journey.pricePerKg}/kg</span>
-                    <span>Accepted: {journey.acceptedParcels} parcels</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
-                      View Requests
-                    </Button>
-                    <Button size="sm">
-                      Manage
-                    </Button>
-                    {journey.acceptedParcels === 0 && (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => deleteJourney(journey.id, journey.acceptedParcels)}
-                        className="text-red-600 border-red-600 hover:bg-red-50"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Journey Management</CardTitle>
+              <CardDescription>
+                Track and manage your train journeys for parcel delivery
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Train Details</TableHead>
+                      <TableHead>Route</TableHead>
+                      <TableHead>Departure</TableHead>
+                      <TableHead>Arrival</TableHead>
+                      <TableHead>Capacity</TableHead>
+                      <TableHead>Rate</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Parcels</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {journeys.map((journey) => (
+                      <TableRow key={journey.id}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {journey.trainName}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {journey.trainNumber} • PNR: {journey.pnr}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {journey.fromStation} → {journey.toStation}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {formatDate(journey.departureDate)}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {formatTime(journey.departureTime)}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {journey.arrivalDate ? formatDate(journey.arrivalDate) : 'TBD'}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {formatTime(journey.arrivalTime)}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-medium">{journey.availableCapacity} kg</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-medium">₹{journey.pricePerKg}/kg</span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusVariant(journey.status)}>
+                            {journey.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-medium">{journey.acceptedParcels}</span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2 justify-end">
+                            <Button variant="outline" size="sm" onClick={() => openDetailDialog(journey)}>
+                              <EyeIcon className="h-4 w-4 mr-1" />
+                              Requests
+                            </Button>
+                            <Button size="sm" onClick={() => openDetailDialog(journey)}>
+                              <CogIcon className="h-4 w-4 mr-1" />
+                              Manage
+                            </Button>
+                            {journey.acceptedParcels === 0 && (
+                              <Button 
+                                variant="destructive" 
+                                size="sm"
+                                onClick={() => openDeleteDialog(journey)}
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
-            ))}
-          </div>
+            </CardContent>
+          </Card>
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmDialog
+          open={deleteDialog.open}
+          onOpenChange={(open) => setDeleteDialog(prev => ({ ...prev, open }))}
+          title="Delete Journey"
+          description={
+            deleteDialog.acceptedParcels > 0
+              ? `Cannot delete "${deleteDialog.journeyName}" because it has ${deleteDialog.acceptedParcels} accepted parcel(s). Please complete or cancel existing parcels first.`
+              : `Are you sure you want to delete "${deleteDialog.journeyName}"? This action cannot be undone.`
+          }
+          confirmText={deleteDialog.acceptedParcels > 0 ? undefined : "Delete Journey"}
+          variant="destructive"
+          onConfirm={deleteDialog.acceptedParcels > 0 ? () => {} : handleDeleteConfirm}
+          loading={deleting}
+        />
+
+        {/* Journey Details Dialog */}
+        <JourneyDetailsDialog
+          open={detailDialogOpen}
+          onOpenChange={setDetailDialogOpen}
+          journey={selectedJourney}
+        />
       </div>
     </div>
   );
 }
+
 
 
 

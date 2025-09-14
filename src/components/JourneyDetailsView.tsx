@@ -12,7 +12,7 @@ import {
   TicketIcon,
   ArrowRightIcon
 } from '@heroicons/react/24/outline';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import ParcelTimeline from './ParcelTimeline';
 
 interface JourneyDetailsProps {

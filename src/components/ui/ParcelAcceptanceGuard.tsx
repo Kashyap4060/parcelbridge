@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCarrierVerification } from '@/hooks/useCarrierVerification';
-import { Button } from './Button';
+import { Button } from './button';
 import { DocumentTextIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 interface ParcelAcceptanceGuardProps {
@@ -113,6 +113,7 @@ export function AcceptParcelButton({ onAccept, parcelId, disabled, className }: 
     </Button>
   );
 }
+
 
 
 
