@@ -2,13 +2,15 @@
  * Centralized Auth Error Boundary
  * Handles all authentication-related errors and redirects
  * Prevents hardcoded access denied messages throughout the app
+ * Now includes redirect functionality for post-login navigation
  */
 
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useSimpleAuth } from '@/hooks/useSimpleAuth';
+import AuthRedirectManager from '@/lib/authRedirect';
 
 interface AuthErrorBoundaryProps {
   children: React.ReactNode;
@@ -26,9 +28,13 @@ interface AuthErrorProps {
 
 const AuthError: React.FC<AuthErrorProps> = ({ type, expectedRole, currentRole }) => {
   const router = useRouter();
+  const pathname = usePathname();
 
   const handleLogin = () => {
-    router.push('/auth/login');
+    // Store current URL before redirecting to login
+    const currentUrl = pathname + (typeof window !== 'undefined' ? window.location.search : '');
+    const loginUrl = AuthRedirectManager.createLoginUrl(currentUrl);
+    router.push(loginUrl);
   };
 
   const handleRoleSelection = () => {
@@ -123,12 +129,17 @@ export const AuthErrorBoundary: React.FC<AuthErrorBoundaryProps> = ({
 }) => {
   const { user, isAuthenticated, loading } = useSimpleAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (loading) return;
 
     // Auto-redirect for unauthenticated users if redirectTo is specified
     if (requireAuth && !isAuthenticated && redirectTo) {
+      // Store current URL before redirecting
+      const currentUrl = pathname + (typeof window !== 'undefined' ? window.location.search : '');
+      AuthRedirectManager.storeIntendedUrl(currentUrl, 'protected_route');
+      
       router.replace(redirectTo);
       return;
     }
@@ -138,7 +149,7 @@ export const AuthErrorBoundary: React.FC<AuthErrorBoundaryProps> = ({
       router.replace(redirectTo);
       return;
     }
-  }, [user, isAuthenticated, loading, requireAuth, requireRole, redirectTo, router]);
+  }, [user, isAuthenticated, loading, requireAuth, requireRole, redirectTo, router, pathname]);
 
   // Show loading state
   if (loading) {

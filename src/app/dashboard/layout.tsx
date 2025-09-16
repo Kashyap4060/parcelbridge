@@ -14,7 +14,8 @@ import {
   CogIcon,
   MapIcon,
   Bars3Icon,
-  XMarkIcon
+  XMarkIcon,
+  CalculatorIcon
 } from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
 
@@ -27,6 +28,7 @@ interface SidebarNavItem {
 
 const navigation: SidebarNavItem[] = [
   { title: 'Dashboard', href: '/dashboard', icon: CogIcon },
+  { title: 'Fee Calculator', href: '/dashboard/sender/fee-calculator', icon: CalculatorIcon, roles: ['sender'] },
   { title: 'Create Request', href: '/dashboard/sender/create-request', icon: PaperAirplaneIcon, roles: ['sender'] },
   { title: 'My Requests', href: '/dashboard/sender/requests', icon: TruckIcon, roles: ['sender'] },
   { title: 'Add Journey', href: '/dashboard/carrier/add-journey', icon: MapIcon, roles: ['carrier'] },

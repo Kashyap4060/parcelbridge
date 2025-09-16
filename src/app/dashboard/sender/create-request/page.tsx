@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSimpleAuth } from '@/hooks/useSimpleAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +20,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 function CreateRequestContent() {
   const { user, isAuthenticated } = useSimpleAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     fromStation: null as Station | null,
@@ -34,6 +35,57 @@ function CreateRequestContent() {
     customParcelType: '',
     description: ''
   });
+
+  // Pre-fill form data from URL parameters (from fee calculator)
+  useEffect(() => {
+    const fillFromParams = () => {
+      try {
+        // Get station data
+        const fromStationParam = searchParams.get('fromStation');
+        const toStationParam = searchParams.get('toStation');
+        
+        if (fromStationParam) {
+          const fromStation = JSON.parse(fromStationParam);
+          setFormData(prev => ({ ...prev, fromStation }));
+        }
+        
+        if (toStationParam) {
+          const toStation = JSON.parse(toStationParam);
+          setFormData(prev => ({ ...prev, toStation }));
+        }
+        
+        // Get dimension data
+        const length = searchParams.get('length');
+        const breadth = searchParams.get('breadth');
+        const height = searchParams.get('height');
+        const weight = searchParams.get('weight');
+        
+        if (length) setFormData(prev => ({ ...prev, length }));
+        if (breadth) setFormData(prev => ({ ...prev, breadth }));
+        if (height) setFormData(prev => ({ ...prev, height }));
+        if (weight) setFormData(prev => ({ ...prev, weight }));
+        
+        // Show success message if data was pre-filled
+        if (fromStationParam || toStationParam || length || breadth || height || weight) {
+          toast({
+            title: "Form Pre-filled",
+            description: "Data from your fee calculation has been loaded into the form.",
+            variant: "default",
+          });
+        }
+        
+      } catch (error) {
+        console.error('Error parsing URL parameters:', error);
+        toast({
+          title: "Pre-fill Error",
+          description: "Some data couldn't be loaded from your previous calculation.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    fillFromParams();
+  }, [searchParams]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;

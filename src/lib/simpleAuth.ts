@@ -222,6 +222,21 @@ export class SimpleAuthService {
    */
   async updateUserRole(userId: string, role: 'sender' | 'carrier'): Promise<{ error?: string }> {
     try {
+      // First, get the current role for audit logging
+      const { data: currentProfile, error: fetchError } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching current role:', fetchError);
+        return { error: 'Failed to fetch current role' };
+      }
+
+      const previousRole = currentProfile?.role || null;
+
+      // Update the user's role
       const { error } = await supabase
         .from('user_profiles')
         .update({ role })
@@ -230,6 +245,26 @@ export class SimpleAuthService {
       if (error) {
         console.error('Error updating user role:', error);
         return { error: 'Failed to update user role' };
+      }
+
+      // Log the role change for audit purposes
+      try {
+        const { error: logError } = await supabase
+          .from('user_role_history')
+          .insert({
+            firebase_uid: userId,
+            previous_role: previousRole,
+            new_role: role,
+            reason: 'User initiated role change',
+            created_at: new Date().toISOString()
+          });
+
+        if (logError) {
+          console.warn('Failed to log role change:', logError);
+          // Don't fail the main operation if logging fails
+        }
+      } catch (logError) {
+        console.warn('Error logging role change:', logError);
       }
 
       return {};

@@ -17,8 +17,8 @@ export interface Station {
 }
 
 export interface StationDistance {
-  from_station: string;
-  to_station: string;
+  from_station_code: string;
+  to_station_code: string;
   distance_km: number;
 }
 
@@ -78,7 +78,7 @@ export async function getStationDistance(fromCode: string, toCode: string): Prom
       .from('station_distances')
       .select('distance_km')
       .or(
-        `and(from_station.eq.${fromCode.toUpperCase()},to_station.eq.${toCode.toUpperCase()}),and(from_station.eq.${toCode.toUpperCase()},to_station.eq.${fromCode.toUpperCase()})`
+        `and(from_station_code.eq.${fromCode.toUpperCase()},to_station_code.eq.${toCode.toUpperCase()}),and(from_station_code.eq.${toCode.toUpperCase()},to_station_code.eq.${fromCode.toUpperCase()})`
       )
       .single();
 

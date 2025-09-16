@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSimpleAuth } from '@/hooks/useSimpleAuth';
 import { Button } from '@/components/ui/button';
+import AuthRedirectManager from '@/lib/authRedirect';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -62,8 +63,9 @@ export default function LoginPage() {
     if (result.error) {
       setErrors({ submit: result.error });
     } else if (result.user) {
-      // Redirect to dashboard
-      router.push('/dashboard');
+      // Handle post-login redirect to intended URL
+      console.log('[LoginPage] Login successful, handling redirect...');
+      AuthRedirectManager.executePostLoginRedirect(router);
     }
   };
 
