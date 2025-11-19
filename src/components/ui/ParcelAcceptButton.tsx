@@ -6,7 +6,7 @@ import { useSimpleAuth } from '../../hooks/useSimpleAuth';
 import { useCarrierVerification } from '../../hooks/useCarrierVerification';
 import { acceptParcelWithCollateral, MINIMUM_COLLATERAL } from '../../lib/collateralService';
 import { Button } from './button';
-import { formatCurrency } from '../../lib/utils';
+import { formatCurrency } from '@/lib/centralizedFeeCalculator';
 import { 
   ExclamationTriangleIcon,
   CheckCircleIcon,

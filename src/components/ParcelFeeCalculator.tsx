@@ -12,12 +12,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { StationSelector } from '@/components/ui/StationSelector';
+import { FeeBreakdown, FeeBreakdownSkeleton, FeeBreakdownError } from '@/components/ui/FeeBreakdown';
 import { Station } from '@/lib/stationService';
-import FeeCalculatorService, { 
-  FeeCalculationResult, 
-  ParcelDimensions, 
-  FeeCalculationInput 
-} from '@/lib/feeCalculator';
+import { useFeeCalculation, createFeeCalculationInput } from '@/hooks/useFeeCalculation';
+import { DetailedFeeBreakdown, ParcelDetails } from '@/lib/centralizedFeeCalculator';
 import { 
   CalculatorIcon, 
   PaperAirplaneIcon, 
@@ -40,8 +38,13 @@ interface CalculationHistory {
   timestamp: Date;
   fromStation: Station;
   toStation: Station;
-  dimensions: ParcelDimensions;
-  result: FeeCalculationResult;
+  dimensions: {
+    length: number;
+    breadth: number;
+    height: number;
+    weight: number;
+  };
+  result: DetailedFeeBreakdown;
 }
 
 export default function ParcelFeeCalculator() {
@@ -57,14 +60,12 @@ export default function ParcelFeeCalculator() {
     weight: ''
   });
   
-  // Calculation state
-  const [isCalculating, setIsCalculating] = useState(false);
-  const [calculationResult, setCalculationResult] = useState<FeeCalculationResult | null>(null);
-  const [error, setError] = useState<string>('');
+  // Fee calculation hook
+  const feeCalculation = useFeeCalculation();
   
   // History state
   const [calculationHistory, setCalculationHistory] = useState<CalculationHistory[]>([]);
-  
+
   // Load calculation history from localStorage on mount
   useEffect(() => {
     const savedHistory = localStorage.getItem('parcelFeeHistory');
@@ -100,30 +101,23 @@ export default function ParcelFeeCalculator() {
            parseFloat(dimensions.weight) > 0;
   };
 
-  // Calculate fee
+  // Calculate fee using the hook
   const handleCalculate = async () => {
     if (!isValidForm()) {
-      setError('Please fill in all required fields with valid values');
       return;
     }
 
-    setIsCalculating(true);
-    setError('');
+    const parcelDetails: ParcelDetails = {
+      weight: parseFloat(dimensions.weight),
+      length: parseFloat(dimensions.length),
+      breadth: parseFloat(dimensions.breadth),
+      height: parseFloat(dimensions.height),
+      fromStationCode: fromStation!.code,
+      toStationCode: toStation!.code
+    };
 
     try {
-      const input: FeeCalculationInput = {
-        fromStationCode: fromStation!.code,
-        toStationCode: toStation!.code,
-        dimensions: {
-          length: parseFloat(dimensions.length),
-          breadth: parseFloat(dimensions.breadth),
-          height: parseFloat(dimensions.height),
-          weight: parseFloat(dimensions.weight)
-        }
-      };
-
-      const result = await FeeCalculatorService.calculateFee(input);
-      setCalculationResult(result);
+      const result = await feeCalculation.calculateFee(parcelDetails);
 
       // Add to history
       const newCalculation: CalculationHistory = {
@@ -131,7 +125,12 @@ export default function ParcelFeeCalculator() {
         timestamp: new Date(),
         fromStation: fromStation!,
         toStation: toStation!,
-        dimensions: input.dimensions,
+        dimensions: {
+          length: parseFloat(dimensions.length),
+          breadth: parseFloat(dimensions.breadth),
+          height: parseFloat(dimensions.height),
+          weight: parseFloat(dimensions.weight)
+        },
         result
       };
 
@@ -141,14 +140,11 @@ export default function ParcelFeeCalculator() {
 
     } catch (error) {
       console.error('Error calculating fee:', error);
-      setError('Failed to calculate fee. Please try again.');
-    } finally {
-      setIsCalculating(false);
     }
   };
 
-  // Reset form
-  const handleReset = () => {
+  // Clear all form data
+  const handleClear = () => {
     setFromStation(null);
     setToStation(null);
     setDimensions({
@@ -157,17 +153,16 @@ export default function ParcelFeeCalculator() {
       height: '',
       weight: ''
     });
-    setCalculationResult(null);
-    setError('');
+    feeCalculation.clearCalculation();
   };
 
   // Create request with calculated data
   const handleCreateRequest = () => {
-    if (!calculationResult || !fromStation || !toStation) return;
+    if (!feeCalculation.result || !fromStation || !toStation) return;
 
     const queryParams = new URLSearchParams();
-    queryParams.set('fromStation', fromStation.code);
-    queryParams.set('toStation', toStation.code);
+    queryParams.set('fromStation', JSON.stringify(fromStation));
+    queryParams.set('toStation', JSON.stringify(toStation));
     if (dimensions.length) queryParams.set('length', dimensions.length);
     if (dimensions.breadth) queryParams.set('breadth', dimensions.breadth);
     if (dimensions.height) queryParams.set('height', dimensions.height);
@@ -186,13 +181,24 @@ export default function ParcelFeeCalculator() {
       height: calculation.dimensions.height.toString(),
       weight: calculation.dimensions.weight.toString()
     });
-    setCalculationResult(calculation.result);
+    
+    // Trigger recalculation with loaded data
+    const parcelDetails: ParcelDetails = {
+      weight: calculation.dimensions.weight,
+      length: calculation.dimensions.length,
+      breadth: calculation.dimensions.breadth,
+      height: calculation.dimensions.height,
+      fromStationCode: calculation.fromStation.code,
+      toStationCode: calculation.toStation.code
+    };
+    
+    feeCalculation.calculateFee(parcelDetails);
   };
 
   // Handle input changes
   const handleDimensionChange = (field: keyof FormDimensions, value: string) => {
     setDimensions(prev => ({ ...prev, [field]: value }));
-    setCalculationResult(null); // Clear previous result when inputs change
+    feeCalculation.clearCalculation(); // Clear previous result when inputs change
   };
 
   return (
@@ -201,114 +207,111 @@ export default function ParcelFeeCalculator() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <CalculatorIcon className="h-5 w-5" />
+            <CalculatorIcon className="h-6 w-6" />
             Parcel Fee Calculator
           </CardTitle>
           <CardDescription>
-            Calculate shipping costs for your parcel before creating a request
+            Calculate estimated shipping costs for your parcel before creating a request
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Station Selection */}
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>From Station</Label>
+          {/* Route Selection */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">Route Information</h3>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <InformationCircleIcon className="h-5 w-5 text-blue-600 mt-0.5" />
+                <p className="text-sm text-blue-700">
+                  Select valid railway stations for accurate fee calculation based on train route distances.
+                </p>
+              </div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
               <StationSelector
                 label="From Station"
                 value={fromStation}
                 onChange={setFromStation}
-                placeholder="Select pickup station"
-                className="w-full"
+                placeholder="Search for departure station..."
+                required
               />
-            </div>
-            
-            <div className="space-y-2">
-              <Label>To Station</Label>
               <StationSelector
                 label="To Station"
                 value={toStation}
                 onChange={setToStation}
-                placeholder="Select destination station"
-                className="w-full"
+                placeholder="Search for destination station..."
+                required
               />
             </div>
           </div>
 
-          {/* Parcel Dimensions */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="length">Length (cm)</Label>
-              <Input
-                id="length"
-                type="number"
-                placeholder="0"
-                value={dimensions.length}
-                onChange={(e) => handleDimensionChange('length', e.target.value)}
-                min="0"
-                step="0.1"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="breadth">Breadth (cm)</Label>
-              <Input
-                id="breadth"
-                type="number"
-                placeholder="0"
-                value={dimensions.breadth}
-                onChange={(e) => handleDimensionChange('breadth', e.target.value)}
-                min="0"
-                step="0.1"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="height">Height (cm)</Label>
-              <Input
-                id="height"
-                type="number"
-                placeholder="0"
-                value={dimensions.height}
-                onChange={(e) => handleDimensionChange('height', e.target.value)}
-                min="0"
-                step="0.1"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="weight">Weight (kg)</Label>
-              <Input
-                id="weight"
-                type="number"
-                placeholder="0"
-                value={dimensions.weight}
-                onChange={(e) => handleDimensionChange('weight', e.target.value)}
-                min="0"
-                step="0.1"
-              />
+          {/* Package Dimensions */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">Package Dimensions</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="length">Length (cm)</Label>
+                <Input
+                  id="length"
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={dimensions.length}
+                  onChange={(e) => handleDimensionChange('length', e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="breadth">Breadth (cm)</Label>
+                <Input
+                  id="breadth"
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={dimensions.breadth}
+                  onChange={(e) => handleDimensionChange('breadth', e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="height">Height (cm)</Label>
+                <Input
+                  id="height"
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={dimensions.height}
+                  onChange={(e) => handleDimensionChange('height', e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="weight">Weight (kg)</Label>
+                <Input
+                  id="weight"
+                  type="number"
+                  min="0.1"
+                  max="50"
+                  step="0.1"
+                  value={dimensions.weight}
+                  onChange={(e) => handleDimensionChange('weight', e.target.value)}
+                  placeholder="0.0"
+                />
+              </div>
             </div>
           </div>
-
-          {/* Error Message */}
-          {error && (
-            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
-              <InformationCircleIcon className="h-5 w-5 flex-shrink-0" />
-              <span className="text-sm">{error}</span>
-            </div>
-          )}
 
           {/* Action Buttons */}
-          <div className="flex flex-wrap gap-3">
+          <div className="flex gap-3">
             <Button 
               onClick={handleCalculate}
-              disabled={!isValidForm() || isCalculating}
+              disabled={!isValidForm() || feeCalculation.isCalculating}
               className="flex items-center gap-2"
             >
               <CalculatorIcon className="h-4 w-4" />
-              {isCalculating ? 'Calculating...' : 'Calculate Fee'}
+              {feeCalculation.isCalculating ? 'Calculating...' : 'Calculate Fee'}
             </Button>
             
-            <Button variant="outline" onClick={handleReset}>
+            <Button variant="outline" onClick={handleClear}>
               Reset
             </Button>
           </div>
@@ -316,7 +319,18 @@ export default function ParcelFeeCalculator() {
       </Card>
 
       {/* Calculation Result */}
-      {calculationResult && (
+      {feeCalculation.isCalculating && (
+        <FeeBreakdownSkeleton />
+      )}
+      
+      {feeCalculation.error && !feeCalculation.isCalculating && (
+        <FeeBreakdownError 
+          error={feeCalculation.error}
+          onRetry={handleCalculate}
+        />
+      )}
+      
+      {feeCalculation.result && !feeCalculation.isCalculating && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -325,54 +339,34 @@ export default function ParcelFeeCalculator() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {/* Total Fee */}
-              <div className="flex justify-between items-center p-4 bg-blue-50 rounded-lg border">
-                <span className="text-lg font-semibold">Total Fee:</span>
-                <span className="text-2xl font-bold text-blue-600">
-                  ₹{calculationResult.totalFee.toFixed(2)}
-                </span>
-              </div>
+            <FeeBreakdown 
+              result={feeCalculation.result}
+              fromStation={fromStation?.name}
+              toStation={toStation?.name}
+              weight={parseFloat(dimensions.weight) || undefined}
+              showHeader={false}
+              variant="detailed"
+            />
 
-              {/* Fee Breakdown */}
-              <div className="space-y-3">
-                <h4 className="font-medium text-gray-900">Fee Breakdown:</h4>
-                <div className="grid gap-2">
-                  {calculationResult.breakdown.map((item, index) => (
-                    <div key={index} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
-                      <span className="text-sm text-gray-600">{item.description}</span>
-                      <span className="font-medium">₹{item.amount.toFixed(2)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Delivery Estimate */}
-              <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <ClockIcon className="h-5 w-5 text-green-600" />
-                <span className="text-sm text-green-700">
-                  Estimated delivery: {calculationResult.estimatedDeliveryHours}h
-                  {calculationResult.estimatedDeliveryHours > 24 
-                    ? ` (${Math.ceil(calculationResult.estimatedDeliveryHours / 24)} days)` 
-                    : ''
-                  }
-                </span>
-              </div>
-
-              {/* Create Request Button */}
+            {/* Action Buttons */}
+            <div className="flex gap-3 mt-6 pt-4 border-t">
               <Button 
                 onClick={handleCreateRequest}
-                className="w-full flex items-center justify-center gap-2"
+                className="flex items-center gap-2"
               >
                 <PaperAirplaneIcon className="h-4 w-4" />
-                Create Parcel Request with These Details
+                Create Request with These Details
+              </Button>
+              
+              <Button variant="outline" onClick={handleClear}>
+                Calculate Another
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Recent Calculations History */}
+      {/* Calculation History */}
       {calculationHistory.length > 0 && (
         <Card>
           <CardHeader>
@@ -381,34 +375,30 @@ export default function ParcelFeeCalculator() {
               Recent Calculations
             </CardTitle>
             <CardDescription>
-              Your recent fee calculations
+              Your recent fee calculations (stored locally)
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {calculationHistory.slice(0, 5).map((calculation) => (
-                <div 
-                  key={calculation.id} 
-                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                <div
+                  key={calculation.id}
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
                   onClick={() => handleLoadFromHistory(calculation)}
                 >
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      <span>{calculation.fromStation.code}</span>
-                      <span className="text-gray-400">→</span>
-                      <span>{calculation.toStation.code}</span>
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {calculation.dimensions.length}×{calculation.dimensions.breadth}×{calculation.dimensions.height}cm, {calculation.dimensions.weight}kg
-                    </div>
+                    <p className="font-medium text-sm">
+                      {calculation.fromStation.name} → {calculation.toStation.name}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {calculation.dimensions.weight}kg • {calculation.timestamp.toLocaleDateString()}
+                    </p>
                   </div>
                   <div className="text-right">
-                    <div className="font-semibold text-blue-600">
+                    <p className="font-bold text-green-600">
                       ₹{calculation.result.totalFee.toFixed(2)}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {calculation.timestamp.toLocaleDateString()}
-                    </div>
+                    </p>
+                    <p className="text-xs text-gray-500">Click to load</p>
                   </div>
                 </div>
               ))}

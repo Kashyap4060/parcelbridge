@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { Button } from './button';
-import { formatCurrency } from '../../lib/utils';
+import { formatCurrency } from '@/lib/centralizedFeeCalculator';
 import {
   ExclamationTriangleIcon,
   CheckCircleIcon,

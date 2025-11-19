@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from './button';
-import { formatCurrency } from '../../lib/utils';
+import { formatCurrency } from '@/lib/centralizedFeeCalculator';
 import { 
   WalletIcon, 
   ExclamationTriangleIcon, 

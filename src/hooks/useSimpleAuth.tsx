@@ -39,10 +39,33 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
     // Get initial session
     const initializeAuth = async () => {
       try {
-        const currentUser = await simpleAuth.getCurrentUser();
-        if (currentUser.user) {
-          setUser(currentUser.user);
-          setSession(currentUser.session || null);
+        console.log('Initializing auth...');
+        setLoading(true);
+        
+        // First check Supabase session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          setLoading(false);
+          return;
+        }
+        
+        if (session) {
+          console.log('Session found, getting user profile...');
+          // Session exists, get user profile
+          const currentUser = await simpleAuth.getCurrentUser();
+          if (currentUser.user) {
+            console.log('User profile loaded:', currentUser.user);
+            setUser(currentUser.user);
+            setSession(session);
+          } else {
+            console.log('No user profile found, session might be invalid');
+            // If session exists but no profile, clear the session
+            await supabase.auth.signOut();
+          }
+        } else {
+          console.log('No session found');
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
@@ -56,6 +79,8 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, session: Session | null) => {
+        console.log('Auth state change:', event, session?.user?.id);
+        
         if (event === 'SIGNED_IN' && session?.user) {
           // Get user profile from database (created by trigger)
           const result = await simpleAuth.getCurrentUser();
@@ -74,6 +99,7 @@ export function SimpleAuthProvider({ children }: { children: ReactNode }) {
           }
         } else if (event === 'SIGNED_OUT' || !session) {
           // Clear user data when signed out
+          console.log('User signed out, clearing state');
           setUser(null);
           setSession(null);
         }

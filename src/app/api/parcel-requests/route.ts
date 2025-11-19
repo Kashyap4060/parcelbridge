@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import CentralizedFeeCalculator, { ParcelDetails } from '@/lib/centralizedFeeCalculator';
 
 // Create a service role client for admin operations
 const supabaseAdmin = createClient(
@@ -21,6 +22,8 @@ export interface CreateParcelRequestData {
   height: number;
   parcelType: string;
   description?: string;
+  preferredDate: string;
+  coachType: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -35,11 +38,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find the user profile from Firebase UID
+    // Find the user profile from Supabase Auth ID (not Firebase UID)
     const { data: userProfile, error: profileError } = await supabaseAdmin
       .from('user_profiles')
       .select('id')
-      .eq('firebase_uid', data.senderId)
+      .eq('id', data.senderId)  // Use id directly, not firebase_uid
       .single();
 
     if (profileError || !userProfile) {
@@ -52,21 +55,51 @@ export async function POST(request: NextRequest) {
 
     console.log('Found user profile:', userProfile);
 
-    // Calculate estimated fare based on distance and weight (basic calculation)
-    const baseFare = 50; // Base fare in rupees
-    const perKgRate = 20; // Rate per kg
-    const estimatedFare = baseFare + (data.weight * perKgRate);
+    // Calculate estimated fare using the centralized fee calculator
+    let estimatedFare = 250; // Default fallback
+    let feeBreakdown = {
+      baseFare: 50,
+      weightFare: data.weight * 2,
+      dimensionFare: (data.length + data.breadth + data.height) * 1,
+      distanceFare: 100, // Default
+      total: estimatedFare
+    };
+
+    try {
+      const parcelDetails: ParcelDetails = {
+        weight: data.weight,
+        length: data.length,
+        breadth: data.breadth,
+        height: data.height,
+        fromStationCode: data.fromStationCode,
+        toStationCode: data.toStationCode
+      };
+
+      const feeResult = await CentralizedFeeCalculator.calculateFee(parcelDetails);
+      estimatedFare = feeResult.totalFee;
+      feeBreakdown = {
+        baseFare: feeResult.baseFee,
+        weightFare: feeResult.weightFee,
+        dimensionFare: feeResult.dimensionFee,
+        distanceFare: feeResult.distanceFee,
+        total: feeResult.totalFee
+      };
+    } catch (feeError) {
+      console.error('Error calculating fee with CentralizedFeeCalculator, using fallback:', feeError);
+      // Keep the fallback values set above
+    }
 
     // Combine parcel details with receiver info in description
     const combinedDescription = [
       `Parcel Type: ${data.parcelType}`,
       `Receiver: ${data.receiverName}`,
       `Receiver Phone: ${data.receiverPhone}`,
+      `Preferred Coach: ${data.coachType}`,
       data.description ? `Additional Notes: ${data.description}` : ''
     ].filter(Boolean).join('\n');
 
     const requestData = {
-      sender_id: userProfile.id, // Use the Supabase user profile ID
+      sender_id: userProfile.id, // Use the validated user profile ID
       pickup_station: data.fromStationName,
       pickup_station_code: data.fromStationCode,
       drop_station: data.toStationName,
@@ -78,12 +111,11 @@ export async function POST(request: NextRequest) {
       description: combinedDescription,
       pickup_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours from now
       estimated_fare: estimatedFare,
-      status: 'PENDING' as const,
-      fee_breakdown: {
-        baseFare,
-        weightFare: data.weight * perKgRate,
-        total: estimatedFare
-      }
+      status: 'PENDING_PAYMENT' as const, // Updated to use new enum value
+      payment_status: 'PENDING' as const, // Set initial payment status
+      fee_breakdown: feeBreakdown,
+      preferred_date: data.preferredDate,
+      coach_type: data.coachType
     };
 
     console.log('Creating parcel request with admin client:', requestData);

@@ -467,6 +467,7 @@ CREATE POLICY "Users can update their own profile" ON users FOR UPDATE USING (au
 CREATE POLICY "Anyone can view parcel requests" ON parcel_requests FOR SELECT USING (true);
 CREATE POLICY "Senders can create parcel requests" ON parcel_requests FOR INSERT WITH CHECK (auth.uid() = sender_id);
 CREATE POLICY "Senders can update their own parcel requests" ON parcel_requests FOR UPDATE USING (auth.uid() = sender_id);
+CREATE POLICY "Senders can delete their own parcel requests" ON parcel_requests FOR DELETE USING (auth.uid() = sender_id);
 CREATE POLICY "Carriers can accept parcel requests" ON parcel_requests FOR UPDATE USING (
     auth.uid() = carrier_id OR 
     (carrier_id IS NULL AND EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'carrier'))

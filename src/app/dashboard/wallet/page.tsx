@@ -8,8 +8,14 @@ import { Button } from '@/components/ui/button';
 import { CollateralStatus } from '../../../components/ui/CollateralStatus';
 import PaymentModal from '../../../components/ui/PaymentModal';
 import { ArrowLeftIcon, PlusIcon, CreditCardIcon } from '@heroicons/react/24/outline';
-import { formatCurrency, formatDate } from '../../../lib/utils';
+import { formatCurrency } from '@/lib/centralizedFeeCalculator';
 import { toast } from 'react-hot-toast';
+
+// Local utility for date formatting
+const formatDate = (date: string | Date) => {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+};
 
 interface WalletTransaction {
   id: string;

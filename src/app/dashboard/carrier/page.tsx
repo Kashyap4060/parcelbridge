@@ -9,7 +9,7 @@ import { CarrierVerificationBanner } from '../../../components/ui/CarrierVerific
 import { CollateralStatus } from '../../../components/ui/CollateralStatus';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCurrency } from '../../../lib/utils';
+import { formatCurrency } from '@/lib/centralizedFeeCalculator';
 import {
   TruckIcon,
   MapIcon,

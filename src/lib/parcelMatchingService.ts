@@ -1,24 +1,66 @@
 import { supabase } from '@/lib/supabase';
 import { notificationService } from '@/lib/notificationService';
 import { parcelStatusService } from '@/lib/parcelStatusService';
-import { ParcelRequest, Journey } from '@/types';
 
-export interface ParcelMatch {
-  parcel: ParcelRequest;
-  matchingJourneys: Journey[];
-  bestMatch: {
-    journey: Journey;
-    confidence: number;
-    matchType: 'PERFECT' | 'GOOD' | 'PARTIAL' | 'NO_MATCH';
-    canAccept: boolean;
-    reasons: string[];
-  } | null;
+export interface ParcelRequest {
+  id: string;
+  sender_id: string;
+  pickup_station: string;
+  pickup_station_code: string;
+  drop_station: string;
+  drop_station_code: string;
+  weight: number;
+  description: string;
+  status: 'PENDING_PAYMENT' | 'SEARCHING_CARRIER' | 'MATCHED' | 'ACCEPTED' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELLED';
+  payment_status: 'PENDING' | 'PROCESSING' | 'SUCCESSFUL' | 'FAILED' | 'REFUNDED';
+  estimated_fare: number;
+  matched_carrier_id?: string;
+  matched_journey_id?: string;
+  preferred_date?: string;
+  coach_type?: string;
+  created_at: string;
 }
 
-export interface CarrierParcelStatus {
-  hasActiveParcel: boolean;
-  currentParcelId?: string;
-  canAcceptNew: boolean;
+export interface Journey {
+  id: string;
+  carrier_id: string;
+  pnr: string;
+  train_number?: string;
+  train_name?: string;
+  source_station: string;
+  source_station_code: string;
+  destination_station: string;
+  destination_station_code: string;
+  journey_date: string;
+  departure_time?: string;
+  arrival_time?: string;
+  stations?: any[];
+  coach_type?: string;
+  seat_number?: string;
+  status: 'AVAILABLE' | 'PARCEL_ASSIGNED' | 'COMPLETED' | 'CANCELLED';
+  is_active: boolean;
+  pnr_verified: boolean;
+  created_at: string;
+}
+
+export interface MatchingResult {
+  matched: boolean;
+  confidence: number;
+  reasons: string[];
+  journey?: Journey;
+}
+
+export interface MatchingAttempt {
+  id: string;
+  parcel_id: string;
+  attempt_number: number;
+  carriers_searched: number;
+  matches_found: number;
+  best_match_score?: number;
+  result: 'MATCHED' | 'NO_MATCHES' | 'ERROR';
+  matched_carrier_id?: string;
+  matched_journey_id?: string;
+  created_at: string;
 }
 
 class ParcelMatchingService {

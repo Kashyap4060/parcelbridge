@@ -25,10 +25,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate amount
-    if (amount < 100 || amount > 50000) {
+    // Validate amount (amount is in paise, so ₹1 = 100 paise, ₹50,000 = 5,000,000 paise)
+    if (amount < 100 || amount > 5000000) {
       return NextResponse.json(
-        { error: 'Amount must be between ₹100 and ₹50,000' },
+        { error: 'Amount must be between ₹1 and ₹50,000' },
         { status: 400 }
       );
     }
