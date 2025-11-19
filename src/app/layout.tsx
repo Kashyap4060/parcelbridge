@@ -4,7 +4,7 @@ import "./globals.css";
 import Script from 'next/script';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { ThemeProvider } from '@/components/theme-provider';
-import { ToastProvider } from '@/components/toast-provider';
+import { Footer } from '@/components/Footer';
 
 const inter = Inter({
   subsets: ["latin"],
@@ -95,6 +95,7 @@ export default function RootLayout({
             <main id="main-content" role="main" className="min-h-screen">
               {children}
             </main>
+            <Footer />
           </ClientProviders>
           {/* <ToastProvider /> */}
         </ThemeProvider>

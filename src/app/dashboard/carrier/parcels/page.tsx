@@ -92,7 +92,7 @@ const ParcelCard = ({ match, onAccept, carrierStatus, loading }: ParcelCardProps
         </div>
         <div>
           <p className="text-sm text-gray-500">Dimensions</p>
-          <p className="font-medium">{parcel.dimensions.length}×{parcel.dimensions.width}×{parcel.dimensions.height}cm</p>
+          <p className="font-medium">{parcel.dimensions?.length || 'N/A'}×{parcel.dimensions?.width || 'N/A'}×{parcel.dimensions?.height || 'N/A'}cm</p>
         </div>
         <div>
           <p className="text-sm text-gray-500">Fee</p>
@@ -105,7 +105,7 @@ const ParcelCard = ({ match, onAccept, carrierStatus, loading }: ParcelCardProps
           <p className="text-sm text-gray-500">Pickup Time</p>
           <div className="flex items-center">
             <ClockIcon className="h-4 w-4 mr-1" />
-            <span className="text-sm">{new Date(parcel.pickupTime).toLocaleDateString()}</span>
+            <span className="text-sm">{parcel.pickupTime ? new Date(parcel.pickupTime).toLocaleDateString() : 'N/A'}</span>
           </div>
         </div>
       </div>

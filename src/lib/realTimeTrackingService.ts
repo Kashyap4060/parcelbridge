@@ -1,9 +1,8 @@
 /**
  * Real-Time Tracking Service
- * Phase 2: Combines Railway MCP live status with carrier location for comprehensive package tracking
+ * Phase 2: Combines live status with carrier location for comprehensive package tracking
  */
 
-import { RailwayMCPService } from './railwayMCPService';
 import { supabase as supabaseClient } from '@/lib/supabase';
 import type { 
   PackageTrackingData, 
@@ -15,12 +14,10 @@ import type {
 } from '@/types/tracking';
 
 export class RealTimeTrackingService {
-  private railwayMCP: RailwayMCPService;
   private supabase;
   private trackingIntervals: Map<string, NodeJS.Timeout> = new Map();
 
   constructor() {
-    this.railwayMCP = new RailwayMCPService();
     this.supabase = supabaseClient;
   }
 
@@ -167,26 +164,22 @@ export class RealTimeTrackingService {
   }
 
   /**
-   * Get live train status using Railway MCP
+   * Get live train status
    */
   private async getLiveTrainStatus(trainNumber: string, date: Date): Promise<TrainStatus | null> {
     try {
-      const liveStatus = await this.railwayMCP.getLiveTrainStatus(trainNumber, date);
-      
-      if (!liveStatus) {
-        return null;
-      }
-
+      // For now, return basic status structure without live updates
+      // This can be enhanced later with a different data source
       return {
         train_number: trainNumber,
-        current_station: liveStatus.current_station?.code || '',
-        current_station_name: liveStatus.current_station?.name || '',
-        next_station: liveStatus.next_station?.code || '',
-        next_station_name: liveStatus.next_station?.name || '',
-        delay_minutes: liveStatus.delay || 0,
-        estimated_arrival: liveStatus.eta,
-        train_started: liveStatus.train_started || false,
-        train_terminated: liveStatus.train_terminated || false,
+        current_station: '',
+        current_station_name: '',
+        next_station: '',
+        next_station_name: '',
+        delay_minutes: 0,
+        estimated_arrival: '',
+        train_started: false,
+        train_terminated: false,
         last_updated: new Date().toISOString()
       };
     } catch (error) {

@@ -29,6 +29,11 @@ class RazorpayConfiguration {
   }
 
   private validateConfig(): void {
+    // Skip validation during build time
+    if (process.env.NEXT_PHASE === 'phase-production-build' || process.env.__NEXT_PRIVATE_STANDALONE_BUILD) {
+      return;
+    }
+
     if (!this.config.keyId) {
       throw new Error('RAZORPAY_KEY_ID is required in environment variables');
     }

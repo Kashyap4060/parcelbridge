@@ -6,7 +6,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { MapPinIcon, TrainIcon, ClockIcon, AlertTriangleIcon } from '@heroicons/react/24/outline';
+import { MapPinIcon, RectangleStackIcon, ClockIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid';
 import { useRailwayMCP } from '../../hooks/useRailwayMCP';
 import type { 
@@ -143,9 +143,9 @@ export default function RealTimeTracking({
       case 'cancelled':
         return <XCircleIcon className="w-5 h-5 text-red-500" />;
       case 'delayed':
-        return <AlertTriangleIcon className="w-5 h-5 text-red-600" />;
+        return <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />;
       case 'in_transit':
-        return <TrainIcon className="w-5 h-5 text-purple-500" />;
+        return <RectangleStackIcon className="w-5 h-5 text-purple-500" />;
       default:
         return <MapPinIcon className="w-5 h-5" />;
     }
@@ -279,7 +279,7 @@ export default function RealTimeTracking({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-center space-x-2 mb-2">
-              <TrainIcon className="w-5 h-5 text-blue-600" />
+              <RectangleStackIcon className="w-5 h-5 text-blue-600" />
               <span className="font-semibold text-gray-900">Train {trackingSummary.train_number}</span>
             </div>
             {trackingSummary.current_location && (
@@ -304,7 +304,7 @@ export default function RealTimeTracking({
 
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-center space-x-2 mb-2">
-              <AlertTriangleIcon className={`w-5 h-5 ${trackingSummary.delay_minutes > 0 ? 'text-red-600' : 'text-green-600'}`} />
+              <ExclamationTriangleIcon className={`w-5 h-5 ${trackingSummary.delay_minutes > 0 ? 'text-red-600' : 'text-green-600'}`} />
               <span className="font-semibold text-gray-900">Status</span>
             </div>
             <p className={`text-sm ${trackingSummary.delay_minutes > 0 ? 'text-red-600' : 'text-green-600'}`}>

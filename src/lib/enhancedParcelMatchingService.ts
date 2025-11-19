@@ -182,7 +182,7 @@ class EnhancedParcelMatchingService {
         matches_found: matchesFound,
         best_match_score: bestScore,
         result: bestMatch ? 'MATCHED' : 'NO_MATCHES',
-        matched_carrier_id: bestMatch?.carrier_id,
+        matched_carrier_id: (bestMatch as any)?.carrier_id,
         matched_journey_id: bestMatch?.id
       });
 
@@ -191,10 +191,23 @@ class EnhancedParcelMatchingService {
         const assignResult = await this.assignCarrierToParcel(parcelId, bestMatch);
         
         if (assignResult.success) {
-          console.log(`Automatically matched parcel ${parcelId} to carrier ${bestMatch.carrier_id}`);
+          console.log(`Automatically matched parcel ${parcelId} to carrier ${(bestMatch as any).carrier_id}`);
           
-          // Send notification to carrier
-          await notificationService.notifyCarrierOfMatch(bestMatch.carrier_id, parcelId);
+          // Send notification to carrier - create a basic notification
+          try {
+            await notificationService.createNotification({
+              userId: (bestMatch as any).carrier_id,
+              type: 'parcel_accepted',
+              title: 'New Parcel Match Found!',
+              message: 'A parcel has been automatically matched to your journey.',
+              data: {
+                parcelId,
+                journeyId: bestMatch.id
+              }
+            });
+          } catch (error) {
+            console.error('Failed to send match notification:', error);
+          }
           
           return {
             matched: true,

@@ -1,9 +1,8 @@
 /**
- * Station service - Enhanced with Railway MCP Integration
+ * Station service
  */
 
 import { supabase } from './supabase';
-import { RailwayMCPService } from './railwayMCPService';
 
 export interface Station {
   id?: string;
@@ -70,32 +69,17 @@ export async function getStationByCode(code: string): Promise<Station | null> {
 }
 
 /**
- * Enhanced distance calculation with Railway MCP integration
- * Priority: Railway MCP → Database → Coordinates → Hardcoded → Default
+ * Get distance between two stations
+ * Priority: Database → Coordinates → Hardcoded → Default
  */
 export async function getStationDistance(fromCode: string, toCode: string): Promise<number | null> {
   try {
     const from = fromCode.toUpperCase();
     const to = toCode.toUpperCase();
     
-    console.log(`🔍 Enhanced distance lookup: ${from} → ${to}`);
+    console.log(`🔍 Distance lookup: ${from} → ${to}`);
     
-    // **Phase 1: Try Railway MCP API first (Most Accurate)**
-    try {
-      const mcpDistance = await RailwayMCPService.getAccurateDistance(from, to);
-      if (mcpDistance && mcpDistance > 0) {
-        console.log(`🚂 Railway MCP distance: ${mcpDistance} km`);
-        return mcpDistance;
-      }
-    } catch (mcpError: any) {
-      // Log error but don't spam console on repeated failures
-      if (!mcpError.message.includes('CORS') && !mcpError.message.includes('Failed to fetch')) {
-        console.log(`⚠️ Railway MCP error:`, mcpError.message);
-      }
-      // Silently fall back to database without logging for common network errors
-    }
-
-    // **Phase 2: Try Database Lookup (Current Implementation)**
+    // **Phase 1: Try Database Lookup**
     // Try direct lookup first (from → to)
     let { data, error } = await supabase
       .from('station_distances')
