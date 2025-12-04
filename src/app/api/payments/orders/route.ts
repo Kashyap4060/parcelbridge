@@ -7,14 +7,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { razorpayAPI } from '@/lib/razorpay/api';
 import { razorpayConfig } from '@/lib/razorpay/config';
 import { feeCalculationService } from '@/lib/feeCalculation';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import type { ParcelPaymentIntent } from '@/lib/razorpay/types';
-
-// Initialize Supabase client with service role
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 export async function POST(request: NextRequest) {
   try {

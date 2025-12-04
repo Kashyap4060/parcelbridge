@@ -5,14 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { razorpayAPI } from '@/lib/razorpay/api';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import type { WebhookEvent } from '@/lib/razorpay/types';
-
-// Initialize Supabase client with service role
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 export async function POST(request: NextRequest) {
   try {

@@ -13,6 +13,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Check if supabaseAdmin is properly initialized
+    if (!supabaseAdmin || !supabaseAdmin.from) {
+      console.warn('Supabase admin client not initialized');
+      return NextResponse.json(
+        { exists: false, error: 'Database service unavailable' },
+        { status: 503 }
+      );
+    }
+
     const { data, error } = await supabaseAdmin
       .from('train_journeys')
       .select('id')
